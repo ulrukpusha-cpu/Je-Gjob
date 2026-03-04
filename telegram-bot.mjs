@@ -88,6 +88,17 @@ bot.onText(/\/conseils_profil/, (msg) => {
 bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
 
+  // Paiement Telegram réussi
+  if (msg.successful_payment) {
+    console.log('Paiement réussi :', msg.successful_payment);
+    await bot.sendMessage(
+      chatId,
+      "✅ Paiement reçu ! Ton compte *Je Gjobe Premium* est activé. Ouvre à nouveau la webapp si besoin.",
+      { parse_mode: 'Markdown' }
+    );
+    return;
+  }
+
   // Données envoyées depuis la WebApp (ex: demande d'abonnement premium)
   if (msg.web_app_data && msg.web_app_data.data) {
     try {

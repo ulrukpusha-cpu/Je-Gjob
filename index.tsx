@@ -154,8 +154,11 @@ const App = () => {
       return saved ? JSON.parse(saved) : {
         name: '',
         email: '',
+        jobTitle: '',
         skills: [],
         bio: '',
+        locationPreference: '',
+        availability: '',
         isCreated: false,
         profilePicture: undefined,
         isPremium: false,
@@ -167,8 +170,11 @@ const App = () => {
       return {
         name: '',
         email: '',
+        jobTitle: '',
         skills: [],
         bio: '',
+        locationPreference: '',
+        availability: '',
         isCreated: false,
         profilePicture: undefined,
         isPremium: false,
@@ -469,12 +475,25 @@ const App = () => {
     setLoadingJobs(true);
     try {
       const categoryLabel = CATEGORIES.find(c => c.id === category)?.label || "Services divers";
+      const profileContext = `
+        Profil jobber:
+        - Métier principal: ${profile.jobTitle || 'Non renseigné'}
+        - Compétences: ${(profile.skills && profile.skills.length > 0) ? profile.skills.join(', ') : 'Non renseigné'}
+        - Zone / ville préférée: ${profile.locationPreference || 'Basée sur la géolocalisation actuelle'}
+        - Disponibilités: ${profile.availability || 'Non renseigné'}
+      `;
+
       const prompt = `
         Génère 6 annonces de jobs pour une app style AlloVoisins.
         Catégorie: ${category === 'all' ? 'Divers (Plombier, Ménage, etc.)' : categoryLabel}.
         Lieu: Lat ${lat}, Lng ${lng}. Rayon < 30km.
         Langue: Français.
         Certaines annonces doivent être marquées comme premium (isPremium = true).
+        
+        Les annonces doivent être prioritairement pertinentes pour ce profil jobber:
+        ${profileContext}
+
+        Si des informations de profil ne sont pas renseignées, génère des annonces générales mais réalistes.
 
         JSON uniquement, tableau d'objets:
         {
@@ -779,6 +798,8 @@ const App = () => {
         setIsLoading(true);
         tg.sendData(JSON.stringify({ action: 'premium_subscribe' }));
         alert("Demande d'abonnement envoyée au bot Telegram. Vous recevrez une facture dans la conversation.");
+        // Pour la démo front, on active directement le mode Premium.
+        handlePaymentSuccess();
       } catch (e) {
         console.error('Telegram payment error', e);
         setError("Le paiement Telegram a échoué ou a été annulé.");
@@ -794,6 +815,8 @@ const App = () => {
         return;
       }
       window.open(DJAMO_PAYMENT_URL, '_blank');
+      // Activation immédiate côté front (démo)
+      handlePaymentSuccess();
     };
 
     const handleWavePayment = () => {
@@ -803,6 +826,8 @@ const App = () => {
         return;
       }
       window.open(WAVE_QR_URL, '_blank');
+      // Activation immédiate côté front (démo)
+      handlePaymentSuccess();
     };
 
     if (!showPaymentModal) return null;
@@ -1486,7 +1511,39 @@ const App = () => {
   );
   };
 
-  const ProfileView = () => (
+  const ProfileView = () => {
+    const [skillInput, setSkillInput] = useState('');
+
+    const handleProfileFieldChange = (field, value) => {
+      setProfile(prev => ({ ...prev, [field]: value, isCreated: true }));
+    };
+
+    const handleAddSkill = () => {
+      const trimmed = skillInput.trim();
+      if (!trimmed) return;
+      setProfile(prev => ({
+        ...prev,
+        isCreated: true,
+        skills: prev.skills.includes(trimmed) ? prev.skills : [...prev.skills, trimmed]
+      }));
+      setSkillInput('');
+    };
+
+    const handleRemoveSkill = (skill) => {
+      setProfile(prev => ({
+        ...prev,
+        skills: prev.skills.filter(s => s !== skill)
+      }));
+    };
+
+    const handleSkillInputKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleAddSkill();
+      }
+    };
+
+    return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-20">
       {/* Profile Header */}
       <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6 text-center relative overflow-hidden">
@@ -1511,7 +1568,10 @@ const App = () => {
         </div>
         
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{profile.name || "Utilisateur"}</h2>
-        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">{profile.email || "email@example.com"}</p>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">{profile.email || "email@example.com"}</p>
+        {profile.jobTitle && (
+          <p className="text-gray-600 dark:text-gray-300 text-sm mb-2">{profile.jobTitle}</p>
+        )}
         
         <div className="flex justify-center gap-2 mb-6 flex-wrap">
           {profile.skills.length > 0 ? (
@@ -1544,9 +1604,121 @@ const App = () => {
              className="mt-6 w-full py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-white dark:to-gray-100 text-white dark:text-gray-900 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
           >
              <Crown size={18} className="text-amber-400 dark:text-amber-500 fill-amber-400 dark:fill-amber-500" />
-             Passer Premium (9.99€)
+             Passer Premium (2 000 XOF / mois)
           </button>
         )}
+      </div>
+
+      {/* Profile Form */}
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Informations du profil</h3>
+
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Nom complet</label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                value={profile.name}
+                onChange={e => handleProfileFieldChange('name', e.target.value)}
+                placeholder="Ex : Jean Dupont"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Email</label>
+              <input
+                type="email"
+                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                value={profile.email}
+                onChange={e => handleProfileFieldChange('email', e.target.value)}
+                placeholder="email@example.com"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Métier / rôle principal</label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                value={profile.jobTitle || ''}
+                onChange={e => handleProfileFieldChange('jobTitle', e.target.value)}
+                placeholder="Ex : Plombier, Baby-sitter, Ménage..."
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Zone / ville préférée</label>
+              <input
+                type="text"
+                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                value={profile.locationPreference || ''}
+                onChange={e => handleProfileFieldChange('locationPreference', e.target.value)}
+                placeholder="Ex : Cocody, Yopougon..."
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Disponibilités</label>
+            <input
+              type="text"
+              className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+              value={profile.availability || ''}
+              onChange={e => handleProfileFieldChange('availability', e.target.value)}
+              placeholder="Ex : Soir et week-end, tous les jours..."
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Compétences</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {profile.skills.length > 0 ? (
+                profile.skills.map((skill, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleRemoveSkill(skill)}
+                    className="px-3 py-1 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full text-xs flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    <span>{skill}</span>
+                    <X size={12} />
+                  </button>
+                ))
+              ) : (
+                <span className="text-gray-400 text-sm italic">Ajoutez vos compétences principales (ménage, plomberie, garde d'enfants...)</span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="flex-1 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                value={skillInput}
+                onChange={e => setSkillInput(e.target.value)}
+                onKeyDown={handleSkillInputKeyDown}
+                placeholder="Ex : Ménage, Baby-sitting..."
+              />
+              <button
+                type="button"
+                onClick={handleAddSkill}
+                className="px-4 py-2 rounded-lg bg-orange-500 text-white text-sm font-semibold hover:bg-orange-600 transition-colors"
+              >
+                Ajouter
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Présentation / bio</label>
+            <textarea
+              className="w-full min-h-[90px] p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white resize-y"
+              value={profile.bio || ''}
+              onChange={e => handleProfileFieldChange('bio', e.target.value)}
+              placeholder="Présentez-vous en quelques phrases : votre expérience, ce que vous proposez, votre façon de travailler..."
+            />
+          </div>
+        </div>
       </div>
 
       {/* Applied Jobs / History */}
@@ -1583,7 +1755,8 @@ const App = () => {
         )}
       </div>
     </div>
-  );
+    );
+  };
 
   const PublicProfileView = () => {
     if (!selectedPublicProfile) return null;
