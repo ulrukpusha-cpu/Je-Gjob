@@ -1,0 +1,10 @@
+# Railway - déploiement du bot Telegram Je Gjobe
+# La webapp est déployée sur Vercel.
+
+[build]
+builder = "nixpacks"
+
+[deploy]
+startCommand = "node telegram-bot.mjs"
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 10
