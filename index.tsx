@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { 
   MapPin, 
@@ -253,11 +253,28 @@ const App = () => {
     }
   }, []);
 
-  // Persist Profile Effect
+  // Persist Profile Effect (avec léger debounce pour éviter les re-renders agressifs sur mobile)
+  const profileSaveTimeout = useRef(null);
   useEffect(() => {
-    if (profile.isCreated) {
-        localStorage.setItem('je_gjobe_profile', JSON.stringify(profile));
+    if (!profile.isCreated) return;
+
+    if (profileSaveTimeout.current) {
+      clearTimeout(profileSaveTimeout.current);
     }
+
+    profileSaveTimeout.current = setTimeout(() => {
+      try {
+        localStorage.setItem('je_gjobe_profile', JSON.stringify(profile));
+      } catch (e) {
+        console.warn('Impossible de sauvegarder le profil', e);
+      }
+    }, 400);
+
+    return () => {
+      if (profileSaveTimeout.current) {
+        clearTimeout(profileSaveTimeout.current);
+      }
+    };
   }, [profile]);
 
   // Persist Notification State
