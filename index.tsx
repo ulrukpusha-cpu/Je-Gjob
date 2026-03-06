@@ -1565,27 +1565,50 @@ const App = () => {
 
   const ProfileView = () => {
     const [skillInput, setSkillInput] = useState('');
+    const [form, setForm] = useState(() => ({
+      name: profile.name || '',
+      email: profile.email || '',
+      jobTitle: profile.jobTitle || '',
+      locationPreference: profile.locationPreference || '',
+      availability: profile.availability || '',
+      bio: profile.bio || '',
+      skills: profile.skills ? [...profile.skills] : []
+    }));
+    const syncedFromProfile = useRef(false);
 
-    const handleProfileFieldChange = (field, value) => {
+    useEffect(() => {
+      if (syncedFromProfile.current) return;
+      if (profile.telegramId || profile.isCreated) {
+        setForm({
+          name: profile.name || '',
+          email: profile.email || '',
+          jobTitle: profile.jobTitle || '',
+          locationPreference: profile.locationPreference || '',
+          availability: profile.availability || '',
+          bio: profile.bio || '',
+          skills: profile.skills ? [...profile.skills] : []
+        });
+        syncedFromProfile.current = true;
+      }
+    }, [profile.telegramId, profile.isCreated]);
+
+    const flushFieldToProfile = (field, value) => {
       setProfile(prev => ({ ...prev, [field]: value, isCreated: true }));
     };
 
     const handleAddSkill = () => {
       const trimmed = skillInput.trim();
       if (!trimmed) return;
-      setProfile(prev => ({
-        ...prev,
-        isCreated: true,
-        skills: prev.skills.includes(trimmed) ? prev.skills : [...prev.skills, trimmed]
-      }));
+      const nextSkills = form.skills.includes(trimmed) ? form.skills : [...form.skills, trimmed];
+      setForm(prev => ({ ...prev, skills: nextSkills }));
+      setProfile(prev => ({ ...prev, skills: nextSkills, isCreated: true }));
       setSkillInput('');
     };
 
     const handleRemoveSkill = (skill) => {
-      setProfile(prev => ({
-        ...prev,
-        skills: prev.skills.filter(s => s !== skill)
-      }));
+      const nextSkills = form.skills.filter(s => s !== skill);
+      setForm(prev => ({ ...prev, skills: nextSkills }));
+      setProfile(prev => ({ ...prev, skills: nextSkills }));
     };
 
     const handleSkillInputKeyDown = (e) => {
@@ -1672,8 +1695,9 @@ const App = () => {
               <input
                 type="text"
                 className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
-                value={profile.name}
-                onChange={e => handleProfileFieldChange('name', e.target.value)}
+                value={form.name}
+                onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                onBlur={e => flushFieldToProfile('name', e.target.value)}
                 placeholder="Ex : Jean Dupont"
               />
             </div>
@@ -1682,8 +1706,9 @@ const App = () => {
               <input
                 type="email"
                 className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
-                value={profile.email}
-                onChange={e => handleProfileFieldChange('email', e.target.value)}
+                value={form.email}
+                onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
+                onBlur={e => flushFieldToProfile('email', e.target.value)}
                 placeholder="email@example.com"
               />
             </div>
@@ -1695,8 +1720,9 @@ const App = () => {
               <input
                 type="text"
                 className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
-                value={profile.jobTitle || ''}
-                onChange={e => handleProfileFieldChange('jobTitle', e.target.value)}
+                value={form.jobTitle}
+                onChange={e => setForm(prev => ({ ...prev, jobTitle: e.target.value }))}
+                onBlur={e => flushFieldToProfile('jobTitle', e.target.value)}
                 placeholder="Ex : Plombier, Baby-sitter, Ménage..."
               />
             </div>
@@ -1705,8 +1731,9 @@ const App = () => {
               <input
                 type="text"
                 className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
-                value={profile.locationPreference || ''}
-                onChange={e => handleProfileFieldChange('locationPreference', e.target.value)}
+                value={form.locationPreference}
+                onChange={e => setForm(prev => ({ ...prev, locationPreference: e.target.value }))}
+                onBlur={e => flushFieldToProfile('locationPreference', e.target.value)}
                 placeholder="Ex : Cocody, Yopougon..."
               />
             </div>
@@ -1717,8 +1744,9 @@ const App = () => {
             <input
               type="text"
               className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
-              value={profile.availability || ''}
-              onChange={e => handleProfileFieldChange('availability', e.target.value)}
+              value={form.availability}
+              onChange={e => setForm(prev => ({ ...prev, availability: e.target.value }))}
+              onBlur={e => flushFieldToProfile('availability', e.target.value)}
               placeholder="Ex : Soir et week-end, tous les jours..."
             />
           </div>
@@ -1726,8 +1754,8 @@ const App = () => {
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Compétences</label>
             <div className="flex flex-wrap gap-2 mb-2">
-              {profile.skills.length > 0 ? (
-                profile.skills.map((skill, i) => (
+              {form.skills.length > 0 ? (
+                form.skills.map((skill, i) => (
                   <button
                     key={i}
                     type="button"
@@ -1765,8 +1793,9 @@ const App = () => {
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Présentation / bio</label>
             <textarea
               className="w-full min-h-[90px] p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white resize-y"
-              value={profile.bio || ''}
-              onChange={e => handleProfileFieldChange('bio', e.target.value)}
+              value={form.bio}
+              onChange={e => setForm(prev => ({ ...prev, bio: e.target.value }))}
+              onBlur={e => flushFieldToProfile('bio', e.target.value)}
               placeholder="Présentez-vous en quelques phrases : votre expérience, ce que vous proposez, votre façon de travailler..."
             />
           </div>
