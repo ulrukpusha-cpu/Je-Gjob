@@ -97,6 +97,7 @@ const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
 const TELEGRAM_PREMIUM_INVOICE_SLUG = process.env.TELEGRAM_PREMIUM_INVOICE_SLUG;
 const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL;
 const WAVE_QR_URL = process.env.WAVE_QR_URL;
+const ADMIN_SECRET = process.env.ADMIN_SECRET || 'jegjobe-admin';
 
 // Client Gemini initialisé uniquement si une clé est fournie
 const geminiClient = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
@@ -188,6 +189,9 @@ const App = () => {
   const [isTelegramWebApp, setIsTelegramWebApp] = useState(false);
   const [telegramUser, setTelegramUser] = useState(null);
 
+  // Admin (accès via ?admin=ADMIN_SECRET)
+  const [isAdmin, setIsAdmin] = useState(() => typeof window !== 'undefined' && localStorage.getItem('je_gjobe_admin') === 'true');
+
   // Navigation Handlers
   const handleNavigate = (view) => {
     if (view === currentView) return;
@@ -221,6 +225,18 @@ const App = () => {
     localStorage.setItem('je_gjobe_theme', theme);
   }, [theme]);
 
+  // Vérifier accès Admin via URL (?admin=SECRET)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const secret = params.get('admin');
+    if (secret && secret === ADMIN_SECRET) {
+      localStorage.setItem('je_gjobe_admin', 'true');
+      setIsAdmin(true);
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash || '');
+    }
+  }, []);
+
   // Telegram WebApp auto-inscription
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -238,16 +254,18 @@ const App = () => {
     const user = tg.initDataUnsafe?.user;
     if (user) {
       setTelegramUser(user);
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+      const usernameEmail = user.username ? `${user.username}@telegram.me` : '';
+      const photoUrl = user.photo_url || null;
       setProfile(prev => {
-        if (prev.isCreated) return prev;
-        const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
-        const usernameEmail = user.username ? `${user.username}@telegram.me` : '';
+        if (prev.isCreated && !photoUrl) return prev;
         return {
           ...prev,
           name: fullName || user.username || prev.name || 'Utilisateur Telegram',
           email: prev.email || usernameEmail,
           isCreated: true,
-          telegramId: user.id
+          telegramId: user.id,
+          profilePicture: photoUrl || prev.profilePicture
         };
       });
     }
@@ -335,11 +353,8 @@ const App = () => {
 
   // 2. Fetch Jobs when category or coords change
   useEffect(() => {
-    if (coords && jobs.length === 0) { // Only fetch if list is empty to avoid overwriting posted jobs immediately
-      fetchJobs(coords.lat, coords.lng, selectedCategory);
-    } else if (coords && selectedCategory !== 'all') {
-      // fetchJobs(coords.lat, coords.lng, selectedCategory);
-    }
+    if (!coords) return;
+    fetchJobs(coords.lat, coords.lng, selectedCategory);
   }, [coords, selectedCategory]);
 
   // 3. Notification System (Simulation)
@@ -625,7 +640,7 @@ const App = () => {
       }
 
       if (!Array.isArray(data)) throw new Error("Response is not an array");
-      setJobs(prev => [...data, ...prev]); 
+      setJobs(data); 
     } catch (error) {
       console.warn("Job generation failed or incomplete, using fallback data.");
       const fallbackJobs = Array.from({ length: 6 }).map((_, i) => {
@@ -656,7 +671,7 @@ const App = () => {
           tags: []
         };
       });
-      setJobs(prev => [...fallbackJobs, ...prev]);
+      setJobs(fallbackJobs);
     } finally {
       setLoadingJobs(false);
     }
@@ -1019,6 +1034,16 @@ const App = () => {
               <PlusCircle size={24} />
             </button>
 
+            {isAdmin && (
+              <button 
+                 onClick={() => handleNavigate('admin')}
+                 className={`flex items-center gap-1 text-sm font-medium transition-colors ${currentView === 'admin' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+              >
+                 <ShieldCheck size={18} />
+                 <span className="hidden sm:inline">Admin</span>
+              </button>
+            )}
+
             <button 
                onClick={() => handleNavigate('about')}
                className={`flex items-center gap-1 text-sm font-medium transition-colors ${currentView === 'about' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
@@ -1371,6 +1396,16 @@ const App = () => {
   const JobList = () => {
       // Sorting & Filtering Logic
     const displayJobs = jobs.filter(job => {
+      // Filter by Category (Ménage, Cuisinier, etc.)
+      if (selectedCategory !== 'all') {
+        const cat = CATEGORIES.find(c => c.id === selectedCategory);
+        const jobCat = String(job.category || '').toLowerCase();
+        const catId = String(selectedCategory).toLowerCase();
+        const catLabel = String(cat?.label || '').toLowerCase();
+        const categoryMatch = jobCat === catId || jobCat === catLabel || job.category === selectedCategory || (cat && job.category === cat.label);
+        if (!categoryMatch) return false;
+      }
+
       // Filter by Price
       if (job.numericPrice > filterMaxPrice) return false;
       // Filter by Distance
@@ -1775,6 +1810,53 @@ const App = () => {
     );
   };
 
+  const AdminView = () => (
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-20">
+      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <ShieldCheck size={28} className="text-orange-500" />
+            Espace Admin
+          </h2>
+          <button
+            onClick={() => {
+              localStorage.removeItem('je_gjobe_admin');
+              setIsAdmin(false);
+              handleHomeClick();
+            }}
+            className="text-sm text-gray-500 hover:text-red-600 dark:hover:text-red-400"
+          >
+            Quitter l’admin
+          </button>
+        </div>
+        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+          Vue d’ensemble de la plateforme (données locales uniquement).
+        </p>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{jobs.length}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Annonces</div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{appliedJobHistory.length}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Candidatures</div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{profile.isPremium ? 'Oui' : 'Non'}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Profil Premium</div>
+          </div>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{isTelegramWebApp ? 'Oui' : 'Non'}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Via Telegram</div>
+          </div>
+        </div>
+        <p className="text-xs text-gray-400 mt-4">
+          Accès admin : ajoutez <code className="bg-gray-200 dark:bg-gray-600 px-1 rounded">?admin=VOTRE_SECRET</code> dans l’URL (défini dans .env : ADMIN_SECRET).
+        </p>
+      </div>
+    </div>
+  );
+
   const PublicProfileView = () => {
     if (!selectedPublicProfile) return null;
     
@@ -1903,6 +1985,8 @@ const App = () => {
       )}
 
       {currentView === 'profile' && <ProfileView />}
+
+      {currentView === 'admin' && <AdminView />}
 
       {currentView === 'about' && <AboutView />}
 

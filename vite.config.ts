@@ -20,7 +20,8 @@ export default defineConfig(({ mode }) => {
         'process.env.AI_PROVIDER': JSON.stringify(env.VITE_AI_PROVIDER || 'gemini'),
         'process.env.TELEGRAM_PREMIUM_INVOICE_SLUG': JSON.stringify(env.TELEGRAM_PREMIUM_INVOICE_SLUG),
         'process.env.DJAMO_PAYMENT_URL': JSON.stringify(env.DJAMO_PAYMENT_URL),
-        'process.env.WAVE_QR_URL': JSON.stringify(env.WAVE_QR_URL)
+        'process.env.WAVE_QR_URL': JSON.stringify(env.WAVE_QR_URL),
+        'process.env.ADMIN_SECRET': JSON.stringify(env.ADMIN_SECRET)
       },
       resolve: {
         alias: {
