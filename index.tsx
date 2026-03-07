@@ -32,8 +32,6 @@ import {
   ArrowLeft,
   PlusCircle
 } from 'lucide-react';
-import { GoogleGenAI, Type } from "@google/genai";
-
 // --- Constants ---
 
 const CATEGORIES = [
@@ -84,23 +82,20 @@ const MOCK_REVIEWS_COMMENTS = [
 
 const MOCK_CLIENT_NAMES = ["Sophie D.", "Marc L.", "Julie B.", "Thomas M.", "Emma R.", "Lucas P."];
 
-// --- AI Configuration (Gemini / OpenAI / Groq) ---
+// --- AI Configuration (Kimi et Anthropic uniquement) ---
 
-type AIProvider = 'gemini' | 'openai' | 'groq';
+type AIProvider = 'kimi' | 'anthropic';
 
-const AI_PROVIDER: AIProvider = (process.env.AI_PROVIDER as AIProvider) || 'gemini';
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || process.env.API_KEY;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
-const GROQ_MODEL = process.env.GROQ_MODEL || 'llama-3.1-8b-instant';
+const AI_PROVIDER: AIProvider = (process.env.AI_PROVIDER as AIProvider) || 'kimi';
+const KIMI_API_KEY = process.env.KIMI_API_KEY;
+const KIMI_MODEL = process.env.KIMI_MODEL || 'kimi-k2-turbo-preview';
+const KIMI_BASE_URL = (process.env.KIMI_BASE_URL || 'https://api.moonshot.ai/v1').replace(/\/$/, '');
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 const TELEGRAM_PREMIUM_INVOICE_SLUG = process.env.TELEGRAM_PREMIUM_INVOICE_SLUG;
 const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL;
 const WAVE_QR_URL = process.env.WAVE_QR_URL;
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'jegjobe-admin';
-
-// Client Gemini initialisé uniquement si une clé est fournie
-const geminiClient = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
 
 // --- Main Component ---
 
@@ -428,36 +423,21 @@ const App = () => {
 
   const reverseGeocode = async (lat, lng) => {
     const basePrompt = `Identify the city and country for these coordinates: ${lat}, ${lng}. Return ONLY the city and country name in French (e.g., "Lyon, France"). Do not add any other text.`;
+    const systemGeocode = "Tu es un service de géocodage. Tu réponds uniquement par \"Ville, Pays\" en français, sans texte supplémentaire.";
 
     try {
-      // Gemini
-      if (AI_PROVIDER === 'gemini' && geminiClient) {
-        const response = await geminiClient.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: basePrompt
-        });
-        const text = typeof response.text === 'function' ? response.text() : response.text;
-        setLocationName((text || '').trim());
-        return;
-      }
-
-      // OpenAI
-      if (AI_PROVIDER === 'openai' && OPENAI_API_KEY) {
-        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      if (AI_PROVIDER === 'kimi' && KIMI_API_KEY) {
+        const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${OPENAI_API_KEY}`
+            Authorization: `Bearer ${KIMI_API_KEY}`
           },
           body: JSON.stringify({
-            model: OPENAI_MODEL,
+            model: KIMI_MODEL,
             temperature: 0.2,
             messages: [
-              {
-                role: 'system',
-                content:
-                  "Tu es un service de géocodage. Tu réponds uniquement par \"Ville, Pays\" en français, sans texte supplémentaire."
-              },
+              { role: 'system', content: systemGeocode },
               { role: 'user', content: basePrompt }
             ]
           })
@@ -468,34 +448,28 @@ const App = () => {
         return;
       }
 
-      // Groq (API OpenAI-compatible)
-      if (AI_PROVIDER === 'groq' && GROQ_API_KEY) {
-        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      if (AI_PROVIDER === 'anthropic' && ANTHROPIC_API_KEY) {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${GROQ_API_KEY}`
+            'x-api-key': ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01'
           },
           body: JSON.stringify({
-            model: GROQ_MODEL,
-            temperature: 0.2,
-            messages: [
-              {
-                role: 'system',
-                content:
-                  "Tu es un service de géocodage. Tu réponds uniquement par \"Ville, Pays\" en français, sans texte supplémentaire."
-              },
-              { role: 'user', content: basePrompt }
-            ]
+            model: ANTHROPIC_MODEL,
+            max_tokens: 256,
+            system: systemGeocode,
+            messages: [{ role: 'user', content: basePrompt }]
           })
         });
         const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content || '';
+        const textBlock = data?.content?.find?.((b) => b.type === 'text');
+        const content = textBlock?.text || '';
         setLocationName(content.trim());
         return;
       }
 
-      // Fallback
       setLocationName("Votre position");
     } catch (e) {
       console.error("Geocoding failed", e);
@@ -546,93 +520,46 @@ const App = () => {
       `;
       let data = [];
 
+      const systemJobs = "Tu es un générateur d'annonces pour une application type AlloVoisins. Tu réponds STRICTEMENT en JSON valide, sans texte autour.";
       try {
-        // Gemini avec schéma JSON typé
-        if (AI_PROVIDER === 'gemini' && geminiClient) {
-          const response = await geminiClient.models.generateContent({
-            model: 'gemini-3-flash-preview',
-            contents: prompt,
-            config: {
-              responseMimeType: "application/json",
-              responseSchema: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    title: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    price: { type: Type.STRING },
-                    numericPrice: { type: Type.NUMBER },
-                    location: { type: Type.STRING },
-                    distance: { type: Type.STRING },
-                    numericDistance: { type: Type.NUMBER },
-                    postedTime: { type: Type.STRING },
-                    category: { type: Type.STRING },
-                    availability: { type: Type.STRING },
-                    contactEmail: { type: Type.STRING },
-                    isPremium: { type: Type.BOOLEAN }
-                  }
-                }
-              }
-            }
-          });
-          const text = typeof response.text === 'function' ? response.text() : response.text;
-          if (text) {
-            data = JSON.parse(text);
-          }
-        } else if (AI_PROVIDER === 'openai' && OPENAI_API_KEY) {
-          // OpenAI – on demande explicitement du JSON
-          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        if (AI_PROVIDER === 'kimi' && KIMI_API_KEY) {
+          const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${OPENAI_API_KEY}`
+              Authorization: `Bearer ${KIMI_API_KEY}`
             },
             body: JSON.stringify({
-              model: OPENAI_MODEL,
+              model: KIMI_MODEL,
               temperature: 0.4,
               messages: [
-                {
-                  role: 'system',
-                  content:
-                    "Tu es un générateur d'annonces pour une application type AlloVoisins. Tu réponds STRICTEMENT en JSON valide, sans texte autour."
-                },
+                { role: 'system', content: systemJobs },
                 { role: 'user', content: prompt }
               ]
             })
           });
           const json = await res.json();
           const content = json?.choices?.[0]?.message?.content || '';
-          if (content) {
-            data = JSON.parse(content);
-          }
-        } else if (AI_PROVIDER === 'groq' && GROQ_API_KEY) {
-          // Groq – API OpenAI-compatible
-          const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          if (content) data = JSON.parse(content);
+        } else if (AI_PROVIDER === 'anthropic' && ANTHROPIC_API_KEY) {
+          const res = await fetch('https://api.anthropic.com/v1/messages', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              Authorization: `Bearer ${GROQ_API_KEY}`
+              'x-api-key': ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01'
             },
             body: JSON.stringify({
-              model: GROQ_MODEL,
-              temperature: 0.4,
-              messages: [
-                {
-                  role: 'system',
-                  content:
-                    "Tu es un générateur d'annonces pour une application type AlloVoisins. Tu réponds STRICTEMENT en JSON valide, sans texte autour."
-                },
-                { role: 'user', content: prompt }
-              ]
+              model: ANTHROPIC_MODEL,
+              max_tokens: 4096,
+              system: systemJobs,
+              messages: [{ role: 'user', content: prompt }]
             })
           });
           const json = await res.json();
-          const content = json?.choices?.[0]?.message?.content || '';
-          if (content) {
-            data = JSON.parse(content);
-          }
+          const textBlock = json?.content?.find?.((b) => b.type === 'text');
+          const content = textBlock?.text || '';
+          if (content) data = JSON.parse(content);
         }
       } catch (parseErr) {
         console.warn("API response was not valid JSON or cut off, falling back to mock data.", parseErr);
@@ -851,17 +778,6 @@ const App = () => {
       handlePaymentSuccess();
     };
 
-    const handleWavePayment = () => {
-      setError('');
-      if (!WAVE_QR_URL) {
-        alert("Le QR code Wave n'est pas encore configuré.");
-        return;
-      }
-      window.open(WAVE_QR_URL, '_blank');
-      // Activation immédiate côté front (démo)
-      handlePaymentSuccess();
-    };
-
     if (!showPaymentModal) return null;
 
     return (
@@ -914,14 +830,27 @@ const App = () => {
                     <span>Payer avec Djamo (Mobile Money XOF)</span>
                  </button>
 
-                 <button 
-                    type="button"
-                    onClick={handleWavePayment}
-                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
-                 >
-                    <Euro size={20} />
-                    <span>Payer avec Wave (scanner le QR code)</span>
-                 </button>
+                 {WAVE_QR_URL ? (
+                   <a
+                     href={WAVE_QR_URL}
+                     target="_blank"
+                     rel="noopener noreferrer"
+                     onClick={() => handlePaymentSuccess()}
+                     className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                   >
+                     <Euro size={20} />
+                     <span>Voir le QR code Wave (ouvrir le PDF)</span>
+                   </a>
+                 ) : (
+                   <button
+                     type="button"
+                     onClick={() => alert("Le QR code Wave n'est pas encore configuré.")}
+                     className="w-full bg-gray-300 dark:bg-gray-600 text-gray-500 py-3 rounded-xl font-bold cursor-not-allowed flex items-center justify-center gap-2"
+                   >
+                     <Euro size={20} />
+                     <span>Wave (non configuré)</span>
+                   </button>
+                 )}
 
                  <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-4">
                    Le paiement est traité via Telegram, Djamo ou Wave. Votre statut Premium sera mis à jour après confirmation côté serveur.

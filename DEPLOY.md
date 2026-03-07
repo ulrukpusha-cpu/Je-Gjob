@@ -22,13 +22,12 @@
 
    | Nom | Valeur | Exemple |
    |-----|--------|--------|
-   | `GEMINI_API_KEY` | Ta clé Gemini | (depuis .env.local) |
-   | `OPENAI_API_KEY` | (optionnel) Clé OpenAI | si VITE_AI_PROVIDER=openai |
-   | `GROQ_API_KEY` | (optionnel) Clé Groq | si VITE_AI_PROVIDER=groq |
-   | `KIMI_API_KEY` | (optionnel) Clé Moonshot/Kimi | si VITE_AI_PROVIDER=kimi |
-   | `KIMI_MODEL` | (optionnel) Modèle Kimi | `kimi-k2-turbo-preview` |
-   | `KIMI_BASE_URL` | (optionnel) URL API Moonshot | `https://api.moonshot.ai/v1` |
-   | `VITE_AI_PROVIDER` | `gemini` / `openai` / `groq` / `kimi` | `gemini` |
+   | `KIMI_API_KEY` | Clé Kimi (Moonshot ou NVIDIA NIM) | si VITE_AI_PROVIDER=kimi |
+   | `KIMI_MODEL` | (optionnel) Modèle Kimi | `moonshotai/kimi-k2-instruct` (NIM) |
+   | `KIMI_BASE_URL` | (optionnel) URL API | `https://integrate.api.nvidia.com/v1` (NIM) |
+   | `ANTHROPIC_API_KEY` | Clé Anthropic (Claude) | si VITE_AI_PROVIDER=anthropic |
+   | `ANTHROPIC_MODEL` | (optionnel) Modèle Claude | `claude-sonnet-4-20250514` |
+   | `VITE_AI_PROVIDER` | `kimi` / `anthropic` | `kimi` |
    | `TELEGRAM_PREMIUM_INVOICE_SLUG` | (optionnel) | `premium-pass` |
    | `DJAMO_PAYMENT_URL` | (optionnel) URL Djamo | `https://pay.djamo.com/...` |
    | `WAVE_QR_URL` | (optionnel) Document QR Wave (PDF ou image) | `/wave-qr.pdf` ou `/wave-qr.png` ou URL complète |
@@ -57,8 +56,8 @@
    | `KIMI_API_KEY` | (recommandé) Clé Kimi/Moonshot pour le **chatbot** d'aide aux utilisateurs |
    | `KIMI_MODEL` | (optionnel) Ex. `kimi-k2-turbo-preview` |
    | `KIMI_BASE_URL` | (optionnel) `https://api.moonshot.ai/v1` |
-   | `OPENAI_API_KEY` | Clé OpenAI (pour l’assistant du bot) |
-   | `OPENAI_MODEL` | (optionnel) Ex. `gpt-4.1-mini` |
+   | `ANTHROPIC_API_KEY` | Clé Anthropic (Claude) (pour l’assistant du bot) |
+   | `ANTHROPIC_MODEL` | (optionnel) Ex. `claude-sonnet-4-20250514` |
    | `TELEGRAM_PAYMENT_PROVIDER_TOKEN` | (optionnel) Token paiement Telegram |
 
 5. **Deploy** : Railway installe les dépendances puis lance `node telegram-bot.mjs`. Le bot reste actif en continu.

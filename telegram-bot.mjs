@@ -1,5 +1,4 @@
 import TelegramBot from 'node-telegram-bot-api';
-import OpenAI from 'openai';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -16,20 +15,29 @@ if (existsSync(envPath)) {
 }
 
 const telegramToken = process.env.TELEGRAM_BOT_TOKEN;
-const openaiApiKey = process.env.OPENAI_API_KEY;
-const openaiModel = process.env.OPENAI_MODEL || 'gpt-4.1-mini';
+const kimiApiKey = process.env.KIMI_API_KEY;
+const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+const anthropicModel = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
+const isNvidiaKimi = kimiApiKey && kimiApiKey.startsWith('nvapi-');
+const kimiBaseUrl = (process.env.KIMI_BASE_URL || (isNvidiaKimi ? 'https://integrate.api.nvidia.com/v1' : 'https://api.moonshot.ai/v1')).replace(/\/$/, '');
+const kimiModel = process.env.KIMI_MODEL || (isNvidiaKimi ? 'moonshotai/kimi-k2-instruct' : 'kimi-k2-turbo-preview');
 
 if (!telegramToken) {
   console.error('TELEGRAM_BOT_TOKEN manquant dans les variables d’environnement.');
   process.exit(1);
 }
 
-if (!openaiApiKey) {
-  console.error('OPENAI_API_KEY manquant dans les variables d’environnement.');
+if (!kimiApiKey && !anthropicApiKey) {
+  console.error('Définissez KIMI_API_KEY ou ANTHROPIC_API_KEY pour le chatbot d’environnement.');
   process.exit(1);
 }
 
-const openai = new OpenAI({ apiKey: openaiApiKey });
+const useKimiForChatbot = !!kimiApiKey;
+if (useKimiForChatbot) {
+  console.log('Chatbot IA: Kimi', isNvidiaKimi ? '(NVIDIA NIM)' : '(Moonshot)', '|', kimiBaseUrl, '|', kimiModel);
+} else {
+  console.log('Chatbot IA: Anthropic (Claude) |', anthropicModel);
+}
 const bot = new TelegramBot(telegramToken, { polling: true });
 const paymentProviderToken = process.env.TELEGRAM_PAYMENT_PROVIDER_TOKEN;
 
@@ -135,28 +143,116 @@ bot.on('message', async (msg) => {
     return;
   }
 
+  const systemPrompt =
+    "Tu es l'assistant officiel de l'application Je Gjobe. " +
+    "Tu aides les utilisateurs à trouver ou proposer des petits boulots, " +
+    "à rédiger de bonnes annonces, et à utiliser la plateforme en français clair et simple.";
+
   try {
     await bot.sendChatAction(chatId, 'typing');
 
-    const completion = await openai.chat.completions.create({
-      model: openaiModel,
-      temperature: 0.4,
-      messages: [
-        {
-          role: 'system',
-          content:
-            "Tu es l'assistant officiel de l'application Je Gjobe. " +
-            "Tu aides les utilisateurs à trouver ou proposer des petits boulots, " +
-            "à rédiger de bonnes annonces, et à utiliser la plateforme en français clair et simple."
-        },
-        { role: 'user', content: text }
-      ]
-    });
+    let answer;
+    if (useKimiForChatbot && kimiApiKey) {
+      const headers = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${kimiApiKey}`
+      };
+      let res = await fetch(`${kimiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: kimiModel,
+          temperature: 0.4,
+          max_tokens: 1024,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: text }
+          ]
+        })
+      });
+      let data = await res.json().catch(() => ({}));
 
-    const answer = completion.choices?.[0]?.message?.content?.trim() || "Désolé, je n'ai pas réussi à générer une réponse.";
+      if (res.status === 202) {
+        const requestId = res.headers.get('NVCF-REQID') || res.headers.get('nvcf-reqid');
+        if (!requestId) {
+          console.error('Kimi/NIM 202 sans NVCF-REQID');
+          throw new Error('API 202 sans requestId');
+        }
+        for (let i = 0; i < 60; i++) {
+          await new Promise(r => setTimeout(r, 2000));
+          res = await fetch(`${kimiBaseUrl}/status/${requestId}`, { headers: { Authorization: `Bearer ${kimiApiKey}` } });
+          data = await res.json().catch(() => ({}));
+          if (res.status === 200) break;
+          if (res.status !== 202) {
+            console.error('Kimi/NIM poll error', res.status, data);
+            throw new Error(data?.message || `API ${res.status}`);
+          }
+        }
+        if (res.status !== 200) throw new Error('Kimi/NIM timeout (polling)');
+      }
+
+      if (!res.ok) {
+        console.error('Kimi/NIM API error', res.status, JSON.stringify(data));
+        throw new Error(data?.message || data?.error?.message || `API ${res.status}`);
+      }
+      answer = data?.choices?.[0]?.message?.content?.trim() || "Désolé, je n'ai pas réussi à générer une réponse.";
+    } else if (anthropicApiKey) {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': anthropicApiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: anthropicModel,
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: text }]
+        })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        console.error('Anthropic API error', res.status, data);
+        throw new Error(data?.error?.message || `API ${res.status}`);
+      }
+      const textBlock = data?.content?.find?.((b) => b.type === 'text');
+      answer = (textBlock?.text || '').trim() || "Désolé, je n'ai pas réussi à générer une réponse.";
+    } else {
+      answer = "Le chatbot n'est pas configuré (KIMI_API_KEY ou ANTHROPIC_API_KEY).";
+    }
+
     await bot.sendMessage(chatId, answer);
   } catch (error) {
-    console.error('Erreur OpenAI ou Telegram :', error);
+    console.error('Erreur chatbot:', error?.message || error);
+    if (error?.cause) console.error('Cause:', error.cause);
+    if (useKimiForChatbot && anthropicApiKey) {
+      try {
+        const res = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': anthropicApiKey,
+            'anthropic-version': '2023-06-01'
+          },
+          body: JSON.stringify({
+            model: anthropicModel,
+            max_tokens: 1024,
+            system: systemPrompt,
+            messages: [{ role: 'user', content: text }]
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) {
+          const textBlock = data?.content?.find?.((b) => b.type === 'text');
+          const fallbackAnswer = (textBlock?.text || '').trim() || "Désolé, pas de réponse.";
+          await bot.sendMessage(chatId, fallbackAnswer);
+          return;
+        }
+      } catch (anthropicErr) {
+        console.error('Fallback Anthropic échoué:', anthropicErr?.message);
+      }
+    }
     await bot.sendMessage(
       chatId,
       "😕 Une erreur est survenue en parlant avec l'IA. Réessaie dans un instant."
