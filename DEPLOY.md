@@ -25,10 +25,13 @@
    | `GEMINI_API_KEY` | Ta clé Gemini | (depuis .env.local) |
    | `OPENAI_API_KEY` | (optionnel) Clé OpenAI | si VITE_AI_PROVIDER=openai |
    | `GROQ_API_KEY` | (optionnel) Clé Groq | si VITE_AI_PROVIDER=groq |
-   | `VITE_AI_PROVIDER` | `gemini` / `openai` / `groq` | `gemini` |
+   | `KIMI_API_KEY` | (optionnel) Clé Moonshot/Kimi | si VITE_AI_PROVIDER=kimi |
+   | `KIMI_MODEL` | (optionnel) Modèle Kimi | `kimi-k2-turbo-preview` |
+   | `KIMI_BASE_URL` | (optionnel) URL API Moonshot | `https://api.moonshot.ai/v1` |
+   | `VITE_AI_PROVIDER` | `gemini` / `openai` / `groq` / `kimi` | `gemini` |
    | `TELEGRAM_PREMIUM_INVOICE_SLUG` | (optionnel) | `premium-pass` |
    | `DJAMO_PAYMENT_URL` | (optionnel) URL Djamo | `https://pay.djamo.com/...` |
-   | `WAVE_QR_URL` | (optionnel) URL QR Wave | `/wave-qr.png` ou URL complète |
+   | `WAVE_QR_URL` | (optionnel) Document QR Wave (PDF ou image) | `/wave-qr.pdf` ou `/wave-qr.png` ou URL complète |
 
 5. **Deploy** : chaque push sur la branche connectée déclenche un déploiement.
 6. L’URL de la webapp sera du type : `https://je-gjobe-xxx.vercel.app`.
@@ -51,6 +54,9 @@
    | Nom | Valeur |
    |-----|--------|
    | `TELEGRAM_BOT_TOKEN` | Token du bot (BotFather) |
+   | `KIMI_API_KEY` | (recommandé) Clé Kimi/Moonshot pour le **chatbot** d'aide aux utilisateurs |
+   | `KIMI_MODEL` | (optionnel) Ex. `kimi-k2-turbo-preview` |
+   | `KIMI_BASE_URL` | (optionnel) `https://api.moonshot.ai/v1` |
    | `OPENAI_API_KEY` | Clé OpenAI (pour l’assistant du bot) |
    | `OPENAI_MODEL` | (optionnel) Ex. `gpt-4.1-mini` |
    | `TELEGRAM_PAYMENT_PROVIDER_TOKEN` | (optionnel) Token paiement Telegram |
