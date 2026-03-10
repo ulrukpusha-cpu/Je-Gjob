@@ -98,6 +98,21 @@ const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL;
 const WAVE_QR_URL = process.env.WAVE_QR_URL || '/wave-qr.png';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'jegjobe-admin';
 
+// Devises selon le pays (code ISO)
+const CURRENCY_BY_COUNTRY = {
+  CI: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  SN: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  ML: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  BF: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  TG: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  BJ: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  NE: { code: 'XOF', symbol: 'XOF', premiumAmount: '2 000', premiumLabel: '2 000 XOF / mois' },
+  US: { code: 'USD', symbol: '$', premiumAmount: '3', premiumLabel: '3 $ / mois' },
+  CA: { code: 'USD', symbol: '$', premiumAmount: '3', premiumLabel: '3 $ / mois' },
+  GB: { code: 'GBP', symbol: '£', premiumAmount: '3', premiumLabel: '3 £ / mois' },
+};
+const DEFAULT_CURRENCY = { code: 'EUR', symbol: '€', premiumAmount: '3', premiumLabel: '3 € / mois' };
+
 // --- Main Component ---
 
 const App = () => {
@@ -116,6 +131,7 @@ const App = () => {
   const [viewHistory, setViewHistory] = useState([]);
   const [locationName, setLocationName] = useState("Localisation inconnue");
   const [coords, setCoords] = useState(null);
+  const [currency, setCurrency] = useState(() => DEFAULT_CURRENCY);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [jobs, setJobs] = useState([]);
   const [loadingJobs, setLoadingJobs] = useState(false);
@@ -306,6 +322,11 @@ const App = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  const formatPrice = (num) => {
+    if (currency.symbol === 'XOF') return `${num} ${currency.symbol}`;
+    return `${num} ${currency.symbol}`.trim();
+  };
+
   const toggleNotifications = async () => {
     if (!notificationsEnabled) {
       // Request permission
@@ -330,6 +351,22 @@ const App = () => {
     }
   };
 
+  // Récupérer le code pays depuis les coordonnées (Nominatim)
+  const getCountryFromCoords = async (lat, lng) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { 'Accept-Language': 'fr', 'User-Agent': 'JeGjobeApp/1.0 (contact@jegjobe.app)' } }
+      );
+      const data = await res.json();
+      const countryCode = (data?.address?.country_code || '').toUpperCase();
+      return countryCode || null;
+    } catch (e) {
+      console.warn('Nominatim reverse geocode failed', e);
+      return null;
+    }
+  };
+
   // 1. Get Location on Mount
   useEffect(() => {
     if ("geolocation" in navigator) {
@@ -337,6 +374,12 @@ const App = () => {
         async (position) => {
           const { latitude, longitude } = position.coords;
           setCoords({ lat: latitude, lng: longitude });
+          const countryCode = await getCountryFromCoords(latitude, longitude);
+          if (countryCode && CURRENCY_BY_COUNTRY[countryCode]) {
+            setCurrency(CURRENCY_BY_COUNTRY[countryCode]);
+          } else {
+            setCurrency(DEFAULT_CURRENCY);
+          }
           await reverseGeocode(latitude, longitude);
           setLoadingLocation(false);
         },
@@ -344,6 +387,7 @@ const App = () => {
           console.error("Error getting location", error);
           setLocationName("Paris, France (Par défaut)");
           setCoords({ lat: 48.8566, lng: 2.3522 }); // Default to Paris
+          setCurrency(DEFAULT_CURRENCY);
           setLoadingLocation(false);
         }
       );
@@ -353,11 +397,11 @@ const App = () => {
     }
   }, []);
 
-  // 2. Fetch Jobs when category or coords change
+  // 2. Fetch Jobs when category, coords or currency change
   useEffect(() => {
     if (!coords) return;
     fetchJobs(coords.lat, coords.lng, selectedCategory);
-  }, [coords, selectedCategory]);
+  }, [coords, selectedCategory, currency]);
 
   // 3. Notification System (Simulation)
   useEffect(() => {
@@ -385,7 +429,7 @@ const App = () => {
         id: `mock-${Date.now()}`,
         title: randomTitle,
         description: "Nouvelle offre ajoutée à l'instant. Besoin rapide !",
-        price: `${randomPrice}€`,
+        price: formatPrice(randomPrice),
         numericPrice: randomPrice,
         location: locationName.split(',')[0] || "Quartier voisin",
         distance: `${randomDist} km`,
@@ -501,6 +545,7 @@ const App = () => {
         Catégorie: ${category === 'all' ? 'Divers (Plombier, Ménage, etc.)' : categoryLabel}.
         Lieu: Lat ${lat}, Lng ${lng}. Rayon < 30km.
         Langue: Français.
+        Devise: ${currency.code}. Affiche les prix avec le symbole approprié (exemple: ${formatPrice(20)}). Utilise numericPrice en nombre.
         Certaines annonces doivent être marquées comme premium (isPremium = true).
         
         Les annonces doivent être prioritairement pertinentes pour ce profil jobber:
@@ -513,7 +558,7 @@ const App = () => {
           "id": "uuid",
           "title": "Titre",
           "description": "Courte description",
-          "price": "20€",
+          "price": "${formatPrice(20)}",
           "numericPrice": 20,
           "location": "Ville",
           "distance": "2.5 km",
@@ -592,7 +637,7 @@ const App = () => {
           id: `fallback-${Date.now()}-${i}`,
           title: randomTitle,
           description: "Annonce (Mode hors ligne). La description détaillée n'a pas pu être chargée.",
-          price: `${20 + i * 5}€`,
+          price: formatPrice(20 + i * 5),
           numericPrice: 20 + i * 5,
           location: locationName.split(',')[0] || "Quartier",
           distance: `${(i + 1) * 1.5} km`,
@@ -725,7 +770,7 @@ const App = () => {
         id: `local-${Date.now()}`,
         title: jobData.title,
         description: jobData.description,
-        price: `${jobData.price}€`,
+        price: formatPrice(jobData.price),
         numericPrice: parseFloat(jobData.price),
         location: jobData.location,
         distance: "0.1 km", 
@@ -807,7 +852,7 @@ const App = () => {
               <div className="flex justify-between items-center mb-6">
                  <div>
                     <span className="text-gray-500 dark:text-gray-400 text-sm">Total à payer</span>
-                    <div className="text-3xl font-bold text-gray-900 dark:text-white">2 000 XOF<span className="text-sm font-normal text-gray-500 dark:text-gray-400"> / mois</span></div>
+                    <div className="text-3xl font-bold text-gray-900 dark:text-white">{currency.premiumLabel}</div>
                  </div>
                  <div className="flex gap-2">
                    <div className="bg-gray-100 dark:bg-gray-700 p-2 rounded w-10 h-6"></div>
@@ -1154,7 +1199,7 @@ const App = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Price */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Budget estimé (€)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Budget estimé ({currency.symbol})</label>
                         <div className="relative">
                             <Euro size={18} className="absolute left-3 top-3.5 text-gray-400" />
                             <input 
@@ -1278,7 +1323,7 @@ const App = () => {
         <div className="max-w-4xl mx-auto mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 animate-in fade-in slide-in-from-top-2">
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                 <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Prix maximum: {filterMaxPrice}€</label>
+                 <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Prix maximum: {formatPrice(filterMaxPrice)}</label>
                  <input 
                    type="range" 
                    min="10" 
@@ -1640,7 +1685,7 @@ const App = () => {
              className="mt-6 w-full py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-white dark:to-gray-100 text-white dark:text-gray-900 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
           >
              <Crown size={18} className="text-amber-400 dark:text-amber-500 fill-amber-400 dark:fill-amber-500" />
-             Passer Premium (2 000 XOF / mois)
+             Passer Premium ({currency.premiumLabel})
           </button>
         )}
       </div>
