@@ -30,7 +30,8 @@ import {
   Bell,
   BellRing,
   ArrowLeft,
-  PlusCircle
+  PlusCircle,
+  MoreVertical
 } from 'lucide-react';
 // --- Constants ---
 
@@ -94,7 +95,7 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 const TELEGRAM_PREMIUM_INVOICE_SLUG = process.env.TELEGRAM_PREMIUM_INVOICE_SLUG;
 const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL;
-const WAVE_QR_URL = process.env.WAVE_QR_URL;
+const WAVE_QR_URL = process.env.WAVE_QR_URL || '/wave-qr.png';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'jegjobe-admin';
 
 // --- Main Component ---
@@ -134,6 +135,8 @@ const App = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
     return localStorage.getItem('je_gjobe_notifications') === 'true';
   });
+
+  const [showHeaderMenu, setShowHeaderMenu] = useState(false);
 
   // Filters State
   const [showFilters, setShowFilters] = useState(false);
@@ -219,6 +222,10 @@ const App = () => {
     }
     localStorage.setItem('je_gjobe_theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    setShowHeaderMenu(false);
+  }, [currentView]);
 
   // Vérifier accès Admin via URL (?admin=SECRET)
   useEffect(() => {
@@ -838,7 +845,7 @@ const App = () => {
                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
                    >
                      <Euro size={20} />
-                     <span>Voir le QR code Wave (ouvrir le PDF)</span>
+                     <span>Voir le QR code Wave</span>
                    </a>
                  ) : (
                    <button
@@ -917,99 +924,123 @@ const App = () => {
 
   const Navbar = () => {
     return (
-      <nav className="bg-white dark:bg-gray-800 shadow-sm fixed top-0 w-full z-50 border-b dark:border-gray-700 transition-colors duration-300">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            {viewHistory.length > 0 && (
-               <button 
-                  onClick={handleBack}
-                  className="mr-2 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
-                  aria-label="Retour"
-               >
-                 <ArrowLeft size={20} />
-               </button>
-            )}
-            <div className="flex items-center gap-2 cursor-pointer" onClick={handleHomeClick}>
-              <div className="bg-orange-500 text-white p-1.5 rounded-lg">
-                <Briefcase size={24} />
-              </div>
-              <span className="font-bold text-xl text-gray-800 dark:text-white">Je Gjobe</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2 md:gap-4">
-            
-            <button 
-               onClick={() => handleNavigate('create_job')}
-               className="hidden sm:flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-full font-medium transition-colors shadow-sm"
-            >
-               <PlusCircle size={18} />
-               <span>Publier</span>
-            </button>
-
-             <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              aria-label="Toggle Theme"
-             >
-               {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-             </button>
-
-            <button 
-               onClick={() => handleNavigate('create_job')}
-               className="sm:hidden p-2 text-orange-500 hover:bg-orange-50 dark:hover:bg-gray-700 rounded-full"
-            >
-              <PlusCircle size={24} />
-            </button>
-
-            {isAdmin && (
+      <nav className="bg-white dark:bg-gray-800/95 backdrop-blur-md shadow-sm fixed top-0 w-full z-50 border-b border-gray-200/80 dark:border-gray-700/80 transition-colors duration-300">
+        <div className="max-w-4xl mx-auto px-4 py-2.5 flex justify-between items-center">
+          <div className="w-10 flex justify-start">
+            {viewHistory.length > 0 ? (
               <button 
-                 onClick={() => handleNavigate('admin')}
-                 className={`flex items-center gap-1 text-sm font-medium transition-colors ${currentView === 'admin' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+                onClick={handleBack}
+                className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+                aria-label="Retour"
               >
-                 <ShieldCheck size={18} />
-                 <span className="hidden sm:inline">Admin</span>
+                <ArrowLeft size={22} />
               </button>
+            ) : (
+              <span className="opacity-0 pointer-events-none" aria-hidden><ArrowLeft size={22} /></span>
             )}
-
-            <button 
-               onClick={() => handleNavigate('about')}
-               className={`flex items-center gap-1 text-sm font-medium transition-colors ${currentView === 'about' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
+          </div>
+          <div className="flex flex-col items-center cursor-pointer flex-1 min-w-0" onClick={handleHomeClick}>
+            <span className="font-bold text-lg tracking-tight text-gray-900 dark:text-white">JE GJOBE</span>
+            <span className="text-[11px] text-gray-500 dark:text-gray-400 uppercase tracking-wider">mini-application</span>
+          </div>
+          <div className="w-10 flex justify-end relative">
+            <button
+              onClick={() => setShowHeaderMenu(!showHeaderMenu)}
+              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors"
+              aria-label="Menu"
             >
-               <Info size={18} />
-               <span className="hidden sm:inline">À propos</span>
+              <MoreVertical size={22} />
             </button>
-
-            <button 
-               onClick={() => handleNavigate('profile')}
-               className={`flex items-center gap-1 text-sm font-medium transition-colors ${currentView === 'profile' ? 'text-orange-500' : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'}`}
-            >
-               <Check size={18} />
-               <span className="hidden sm:inline">Mes Candidatures ({appliedJobs.size})</span>
-               <span className="sm:hidden">({appliedJobs.size})</span>
-            </button>
-
-            <button 
-              onClick={() => handleNavigate('profile')}
-              className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 relative text-gray-600 dark:text-gray-300 overflow-hidden flex items-center gap-1"
-            >
-              {profile.isCreated && profile.profilePicture ? (
-                <img src={profile.profilePicture} alt="Profile" className="w-8 h-8 rounded-full object-cover border border-gray-200 dark:border-gray-600" />
-              ) : (
-                <User size={24} />
-              )}
-              {profile.isPremium && (
-                <Crown size={16} className="text-amber-500 absolute -top-1 -right-1 fill-amber-500 bg-white dark:bg-gray-800 rounded-full" />
-              )}
-              {profile.isCreated && !profile.profilePicture && !profile.isPremium && (
-                <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
-              )}
-            </button>
+            {showHeaderMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowHeaderMenu(false)} aria-hidden />
+                <div className="absolute right-0 top-full mt-1 py-2 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50">
+                  <button onClick={() => { setShowHeaderMenu(false); toggleTheme(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
+                    {theme === 'light' ? 'Mode sombre' : 'Mode clair'}
+                  </button>
+                  <button onClick={() => { setShowHeaderMenu(false); handleNavigate('about'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <Info size={18} />
+                    À propos
+                  </button>
+                  {isAdmin && (
+                    <button onClick={() => { setShowHeaderMenu(false); handleNavigate('admin'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <ShieldCheck size={18} />
+                      Admin
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </nav>
     );
   };
+
+  const HomeLogoBlock = () => (
+    <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700/80 transition-colors">
+      <div className="max-w-4xl mx-auto px-4 py-5 flex items-center gap-4">
+        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/20">
+          <Briefcase size={28} />
+        </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Je Gjobe</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Trouvez des missions près de chez vous</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  const BottomNav = () => (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-t border-gray-200/80 dark:border-gray-700/80 pb-[env(safe-area-inset-bottom)] transition-colors md:max-w-lg md:left-1/2 md:-translate-x-1/2">
+      <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-around">
+        <button
+          onClick={toggleTheme}
+          className="p-3 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          aria-label="Thème"
+        >
+          {theme === 'light' ? <Sun size={24} /> : <Moon size={24} />}
+        </button>
+        <button
+          onClick={() => handleNavigate('create_job')}
+          className="flex items-center justify-center w-14 h-14 -mt-6 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all hover:scale-105"
+          aria-label="Publier une annonce"
+        >
+          <PlusCircle size={28} strokeWidth={2.5} />
+        </button>
+        <button
+          onClick={() => handleNavigate('profile')}
+          className="flex flex-col items-center gap-0.5 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300"
+        >
+          <span className="relative">
+            <Check size={24} />
+            {appliedJobs.size > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-xs font-bold rounded-full px-1">
+                {appliedJobs.size}
+              </span>
+            )}
+          </span>
+          <span className="text-[10px] font-medium">Candidatures</span>
+        </button>
+        <button
+          onClick={() => handleNavigate('profile')}
+          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 relative transition-colors"
+        >
+          {profile.isCreated && profile.profilePicture ? (
+            <img src={profile.profilePicture} alt="Profil" className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600" />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-300">
+              <User size={22} />
+            </div>
+          )}
+          {profile.isPremium && (
+            <Crown size={14} className="text-amber-500 absolute -top-0.5 -right-0.5 fill-amber-500 bg-white dark:bg-gray-800 rounded-full" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
 
   const CreateJobView = () => {
     const [title, setTitle] = useState('');
@@ -1225,17 +1256,19 @@ const App = () => {
   };
 
   const LocationHeader = () => (
-    <div className="bg-white dark:bg-gray-800 pt-4 pb-2 px-4 sticky top-[60px] z-40 shadow-sm transition-colors duration-300">
+    <div className="bg-white dark:bg-gray-800 pt-4 pb-2 px-4 sticky top-[56px] z-40 shadow-sm transition-colors duration-300">
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Votre position</p>
       <div className="flex justify-between items-center max-w-4xl mx-auto">
         <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
-          <MapPin size={18} className="text-orange-500" />
+          <MapPin size={18} className="text-orange-500 shrink-0" />
           <span className="font-medium truncate max-w-[200px] sm:max-w-md">
             {loadingLocation ? "Localisation..." : locationName}
           </span>
         </div>
         <button 
           onClick={() => setShowFilters(!showFilters)}
-          className={`p-2 rounded-lg transition-colors ${showFilters ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+          className={`p-2 rounded-xl transition-colors ${showFilters ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+          aria-label="Filtres"
         >
           <SlidersHorizontal size={20} />
         </button>
@@ -1299,7 +1332,7 @@ const App = () => {
   );
 
   const CategoryFilter = () => (
-    <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 py-3 sticky top-[108px] z-30 transition-colors duration-300">
+    <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 py-3 sticky top-[120px] z-30 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 overflow-x-auto no-scrollbar">
         <div className="flex gap-3 pb-1">
           {CATEGORIES.map((cat) => (
@@ -1371,7 +1404,7 @@ const App = () => {
     }
 
     return (
-    <div className="max-w-4xl mx-auto p-4 pb-20 space-y-4">
+    <div className="max-w-4xl mx-auto p-4 pb-28 space-y-4">
       {loadingJobs && jobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400">
           <Loader2 className="animate-spin mb-4 text-orange-500" size={32} />
@@ -1397,7 +1430,7 @@ const App = () => {
         </div>
       ) : (
         displayJobs.map((job) => (
-          <div key={job.id} className={`bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700 hover:shadow-md transition-all duration-300 group ${job.isPremium ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}>
+          <div key={job.id} className={`bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100/80 dark:border-gray-700/80 hover:shadow-lg hover:border-orange-200 dark:hover:border-orange-900/50 transition-all duration-300 group ${job.isPremium ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}>
              
              {job.isPremium && (
                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold uppercase tracking-wider mb-2">
@@ -1935,6 +1968,7 @@ const App = () => {
       
       {currentView === 'home' && (
         <>
+          <HomeLogoBlock />
           <LocationHeader />
           <CategoryFilter />
           <JobList />
@@ -1954,6 +1988,8 @@ const App = () => {
       <PaymentModal />
       <ConfirmationModal />
       <CancelConfirmationModal />
+
+      {currentView === 'home' && <BottomNav />}
     </div>
   );
 };

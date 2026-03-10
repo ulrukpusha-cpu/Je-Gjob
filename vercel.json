@@ -8,6 +8,12 @@
       "headers": [
         { "key": "Content-Disposition", "value": "inline" }
       ]
+    },
+    {
+      "source": "/wave-qr.png",
+      "headers": [
+        { "key": "Content-Disposition", "value": "inline" }
+      ]
     }
   ],
   "rewrites": [

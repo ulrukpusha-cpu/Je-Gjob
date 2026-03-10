@@ -30,7 +30,7 @@
    | `VITE_AI_PROVIDER` | `kimi` / `anthropic` | `kimi` |
    | `TELEGRAM_PREMIUM_INVOICE_SLUG` | (optionnel) | `premium-pass` |
    | `DJAMO_PAYMENT_URL` | (optionnel) URL Djamo | `https://pay.djamo.com/...` |
-   | `WAVE_QR_URL` | (optionnel) Document QR Wave (PDF ou image) | `/wave-qr.pdf` ou `/wave-qr.png` ou URL complète |
+   | `WAVE_QR_URL` | (optionnel) Image QR Wave | `/wave-qr.png` par défaut, ou URL complète |
 
 5. **Deploy** : chaque push sur la branche connectée déclenche un déploiement.
 6. L’URL de la webapp sera du type : `https://je-gjobe-xxx.vercel.app`.
