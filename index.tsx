@@ -756,9 +756,8 @@ const App = () => {
       try {
         setIsLoading(true);
         tg.sendData(JSON.stringify({ action: 'premium_subscribe' }));
-        alert("Demande d'abonnement envoyée au bot Telegram. Vous recevrez une facture dans la conversation.");
-        // Pour la démo front, on active directement le mode Premium.
-        handlePaymentSuccess();
+        alert("Demande d'abonnement envoyée au bot Telegram. Complétez le paiement dans la conversation. Votre statut Premium sera activé après confirmation.");
+        setShowPaymentModal(false);
       } catch (e) {
         console.error('Telegram payment error', e);
         setError("Le paiement Telegram a échoué ou a été annulé.");
@@ -774,8 +773,8 @@ const App = () => {
         return;
       }
       window.open(DJAMO_PAYMENT_URL, '_blank');
-      // Activation immédiate côté front (démo)
-      handlePaymentSuccess();
+      alert("Complétez le paiement dans la fenêtre ouverte. Votre statut Premium sera activé après confirmation côté serveur.");
+      setShowPaymentModal(false);
     };
 
     if (!showPaymentModal) return null;
@@ -835,7 +834,7 @@ const App = () => {
                      href={WAVE_QR_URL}
                      target="_blank"
                      rel="noopener noreferrer"
-                     onClick={() => handlePaymentSuccess()}
+                     onClick={() => setShowPaymentModal(false)}
                      className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
                    >
                      <Euro size={20} />
