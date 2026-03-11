@@ -113,6 +113,10 @@ const CURRENCY_BY_COUNTRY = {
 };
 const DEFAULT_CURRENCY = { code: 'EUR', symbol: '€', premiumAmount: '3', premiumLabel: '3 € / mois' };
 
+// Taux de change (prix stockés en EUR en base)
+const RATE_EUR_TO_XOF = 650;
+const RATE_USD_TO_XOF = 550; // 1 USD = 550 XOF => 1 EUR = 650/550 USD
+
 // --- Main Component ---
 
 const App = () => {
@@ -322,9 +326,32 @@ const App = () => {
     setTheme(prev => prev === 'light' ? 'dark' : 'light');
   };
 
+  // num = prix en EUR (base). Affiche dans la devise locale avec conversion.
   const formatPrice = (num) => {
-    if (currency.symbol === 'XOF') return `${num} ${currency.symbol}`;
-    return `${num} ${currency.symbol}`.trim();
+    const n = Number(num);
+    if (isNaN(n)) return '';
+    if (currency.code === 'XOF') {
+      const xof = Math.round(n * RATE_EUR_TO_XOF);
+      return `${xof.toLocaleString('fr-FR')} XOF`;
+    }
+    if (currency.code === 'USD') {
+      const usd = (n * RATE_EUR_TO_XOF / RATE_USD_TO_XOF).toFixed(0);
+      return `${usd} $`;
+    }
+    if (currency.code === 'GBP') {
+      const gbp = (n * 0.86).toFixed(0); // ~1 EUR = 0.86 GBP
+      return `${gbp} £`;
+    }
+    return `${n} €`;
+  };
+
+  // Montant saisi en devise locale -> EUR (pour stockage / filtre).
+  const localToEur = (amountStr) => {
+    const a = parseFloat(String(amountStr).replace(/\s/g, '')) || 0;
+    if (currency.code === 'XOF') return a / RATE_EUR_TO_XOF;
+    if (currency.code === 'USD') return (a * RATE_USD_TO_XOF) / RATE_EUR_TO_XOF;
+    if (currency.code === 'GBP') return a / 0.86;
+    return a;
   };
 
   const toggleNotifications = async () => {
@@ -545,7 +572,7 @@ const App = () => {
         Catégorie: ${category === 'all' ? 'Divers (Plombier, Ménage, etc.)' : categoryLabel}.
         Lieu: Lat ${lat}, Lng ${lng}. Rayon < 30km.
         Langue: Français.
-        Devise: ${currency.code}. Affiche les prix avec le symbole approprié (exemple: ${formatPrice(20)}). Utilise numericPrice en nombre.
+        Devise: les montants sont en euros (base). Utilise numericPrice en euros (nombre entre 20 et 200). L'affichage sera converti automatiquement (ex: 75 EUR = 48 750 XOF).
         Certaines annonces doivent être marquées comme premium (isPremium = true).
         
         Les annonces doivent être prioritairement pertinentes pour ce profil jobber:
@@ -766,12 +793,13 @@ const App = () => {
   };
 
   const handleCreateJob = (jobData) => {
+    const priceEur = localToEur(jobData.price);
     const newJob = {
         id: `local-${Date.now()}`,
         title: jobData.title,
         description: jobData.description,
-        price: formatPrice(jobData.price),
-        numericPrice: parseFloat(jobData.price),
+        price: formatPrice(priceEur),
+        numericPrice: priceEur,
         location: jobData.location,
         distance: "0.1 km", 
         numericDistance: 0.1,
@@ -1199,12 +1227,12 @@ const App = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     {/* Price */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Budget estimé ({currency.symbol})</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Budget estimé ({currency.code === 'XOF' ? 'XOF' : currency.symbol})</label>
                         <div className="relative">
                             <Euro size={18} className="absolute left-3 top-3.5 text-gray-400" />
                             <input 
                                 type="number" 
-                                placeholder="Ex: 50"
+                                placeholder={currency.code === 'XOF' ? 'Ex: 50 000' : 'Ex: 50'}
                                 className={`w-full pl-10 p-3 border rounded-xl outline-none focus:border-orange-500 dark:bg-gray-700 dark:text-white ${errors.price ? 'border-red-500' : 'border-gray-200 dark:border-gray-600'}`}
                                 value={price}
                                 onChange={e => setPrice(e.target.value)}
@@ -1516,7 +1544,7 @@ const App = () => {
                  </div>
                </div>
                <div className="text-right">
-                 <div className="font-bold text-xl text-gray-900 dark:text-white">{job.price}</div>
+                 <div className="font-bold text-xl text-gray-900 dark:text-white">{formatPrice(job.numericPrice)}</div>
                  <div className="text-xs text-gray-400 dark:text-gray-500">{job.availability}</div>
                </div>
              </div>
@@ -1821,7 +1849,7 @@ const App = () => {
              <div key={job.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex justify-between items-center shadow-sm">
                 <div>
                   <h4 className="font-bold text-gray-900 dark:text-white">{job.title}</h4>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">{job.price} • {job.postedTime}</p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">{formatPrice(job.numericPrice)} • {job.postedTime}</p>
                 </div>
                 <div>
                    {completedJobIds.has(job.id) ? (
