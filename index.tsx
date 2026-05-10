@@ -1,5 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
+import { useSupabaseAuth } from './src/hooks/useSupabaseAuth';
+import { useProfile } from './src/hooks/useProfile';
+import { useJobs } from './src/hooks/useJobs';
+import { useApplications } from './src/hooks/useApplications';
+import { supabase } from './src/lib/supabase';
+import { uploadAvatar, uploadJobPhotos } from './src/lib/storage';
 import { 
   MapPin, 
   Search, 
@@ -31,7 +37,11 @@ import {
   BellRing,
   ArrowLeft,
   PlusCircle,
-  MoreVertical
+  MoreVertical,
+  Truck,
+  Palette,
+  Code,
+  MoreHorizontal
 } from 'lucide-react';
 // --- Constants ---
 
@@ -43,7 +53,11 @@ const CATEGORIES = [
   { id: 'cuisinier', label: 'Cuisinier', icon: <Utensils size={18} /> },
   { id: 'menuisier', label: 'Menuisier', icon: <Hammer size={18} /> },
   { id: 'mecanicien', label: 'Mécanicien', icon: <Car size={18} /> },
-  { id: 'peintre', label: 'Peintre', icon: <Paintbrush size={18} /> }
+  { id: 'peintre', label: 'Peintre', icon: <Paintbrush size={18} /> },
+  { id: 'livreur', label: 'Livreur', icon: <Truck size={18} /> },
+  { id: 'infographe', label: 'Infographiste', icon: <Palette size={18} /> },
+  { id: 'dev', label: 'Développeur', icon: <Code size={18} /> },
+  { id: 'autre', label: 'Autre', icon: <MoreHorizontal size={18} /> }
 ];
 
 const AVAILABILITY_OPTIONS = [
@@ -137,12 +151,7 @@ const App = () => {
   const [coords, setCoords] = useState(null);
   const [currency, setCurrency] = useState(() => DEFAULT_CURRENCY);
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [jobs, setJobs] = useState([]);
-  const [loadingJobs, setLoadingJobs] = useState(false);
   const [loadingLocation, setLoadingLocation] = useState(true);
-  const [appliedJobs, setAppliedJobs] = useState(new Set());
-  const [appliedJobHistory, setAppliedJobHistory] = useState([]);
-  const [completedJobIds, setCompletedJobIds] = useState(new Set());
   const [confirmingJobId, setConfirmingJobId] = useState(null);
   const [cancelingJobId, setCancelingJobId] = useState(null);
   const [sortBy, setSortBy] = useState('default');
@@ -166,42 +175,16 @@ const App = () => {
   const [filterDate, setFilterDate] = useState('all');
   const [filterTag, setFilterTag] = useState(null);
 
-  // Initialize profile from localStorage if available
-  const [profile, setProfile] = useState(() => {
-    try {
-      const saved = localStorage.getItem('je_gjobe_profile');
-      return saved ? JSON.parse(saved) : {
-        name: '',
-        email: '',
-        jobTitle: '',
-        skills: [],
-        bio: '',
-        locationPreference: '',
-        availability: '',
-        isCreated: false,
-        profilePicture: undefined,
-        isPremium: false,
-        reviews: [],
-        completedMissions: 0
-      };
-    } catch (e) {
-      console.error("Failed to load profile from storage", e);
-      return {
-        name: '',
-        email: '',
-        jobTitle: '',
-        skills: [],
-        bio: '',
-        locationPreference: '',
-        availability: '',
-        isCreated: false,
-        profilePicture: undefined,
-        isPremium: false,
-        reviews: [],
-        completedMissions: 0
-      };
-    }
-  });
+  // Auth Supabase (auto via Telegram WebApp si dispo, sinon mode local)
+  const { userId } = useSupabaseAuth();
+  // Profile : DB en prod (RLS), localStorage en fallback dev
+  const [profile, setProfile] = useProfile(userId);
+  // Jobs : Supabase + Realtime
+  const { jobs, isLoading: loadingJobs, refetch: refetchJobs, createJob } = useJobs({ category: selectedCategory, coords });
+  // Candidatures de l'utilisateur courant
+  const { applications, appliedSet: appliedJobs, completedSet: completedJobIds, applyToJob, cancelApplication } = useApplications(userId);
+  // Historique = derivé des candidatures (tri par date DESC deja fait par le hook)
+  const appliedJobHistory = applications.map(a => a.jobs).filter(Boolean);
 
   // Telegram WebApp state (auto-inscription)
   const [isTelegramWebApp, setIsTelegramWebApp] = useState(false);
@@ -293,29 +276,7 @@ const App = () => {
     }
   }, []);
 
-  // Persist Profile Effect (avec léger debounce pour éviter les re-renders agressifs sur mobile)
-  const profileSaveTimeout = useRef(null);
-  useEffect(() => {
-    if (!profile.isCreated) return;
-
-    if (profileSaveTimeout.current) {
-      clearTimeout(profileSaveTimeout.current);
-    }
-
-    profileSaveTimeout.current = setTimeout(() => {
-      try {
-        localStorage.setItem('je_gjobe_profile', JSON.stringify(profile));
-      } catch (e) {
-        console.warn('Impossible de sauvegarder le profil', e);
-      }
-    }, 400);
-
-    return () => {
-      if (profileSaveTimeout.current) {
-        clearTimeout(profileSaveTimeout.current);
-      }
-    };
-  }, [profile]);
+  // (Persistance du profil gerée par useProfile : LS + Supabase en debounce 400ms)
 
   // Persist Notification State
   useEffect(() => {
@@ -424,77 +385,27 @@ const App = () => {
     }
   }, []);
 
-  // 2. Fetch Jobs when category, coords or currency change
+  // (Le hook useJobs s'occupe du fetch initial + Realtime sur les nouveaux jobs.)
+  // Notifications natives quand un nouveau job apparait (filtre par prefs UI)
+  const lastJobIdRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!coords) return;
-    fetchJobs(coords.lat, coords.lng, selectedCategory);
-  }, [coords, selectedCategory, currency]);
-
-  // 3. Notification System (Simulation)
-  useEffect(() => {
-    // Only run simulation if we are on home view and have coords
-    if (currentView !== 'home' || !coords || loadingJobs) return;
-
-    const intervalId = setInterval(() => {
-      // 1. Determine Category
-      let jobCategory = selectedCategory;
-      if (jobCategory === 'all') {
-        const availableCats = CATEGORIES.filter(c => c.id !== 'all');
-        jobCategory = availableCats[Math.floor(Math.random() * availableCats.length)].id;
-      }
-
-      // 2. Generate Mock Job Data
-      const titles = MOCK_TITLES[jobCategory] || MOCK_TITLES.default;
-      const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-      const randomPrice = Math.floor(Math.random() * 100) + 20;
-      const randomDist = Number((Math.random() * 10).toFixed(1));
-      
-      const availabilities = ['Immédiat', 'Week-end', 'Soirée', 'Semaine'];
-      const randomAvail = availabilities[Math.floor(Math.random() * availabilities.length)];
-
-      const newJob = {
-        id: `mock-${Date.now()}`,
-        title: randomTitle,
-        description: "Nouvelle offre ajoutée à l'instant. Besoin rapide !",
-        price: formatPrice(randomPrice),
-        numericPrice: randomPrice,
-        location: locationName.split(',')[0] || "Quartier voisin",
-        distance: `${randomDist} km`,
-        numericDistance: randomDist,
-        postedTime: "À l'instant",
-        category: jobCategory,
-        availability: randomAvail,
-        contactEmail: `client-${Math.floor(Math.random() * 1000)}@email.com`,
-        isPremium: Math.random() > 0.8, // 20% chance
-        tags: []
-      };
-
-      // 3. Check if matches CURRENT user filters
-      const matchesPrice = newJob.numericPrice <= filterMaxPrice;
-      const matchesDistance = newJob.numericDistance <= filterMaxDistance;
-      const matchesAvailability = filterAvailability === 'all' || newJob.availability === filterAvailability;
-      
-      const matchesDate = true; 
-
-      if (matchesPrice && matchesDistance && matchesAvailability && matchesDate) {
-        setJobs(prev => [newJob, ...prev]);
-        
-        // Trigger Notification if Enabled
-        if (notificationsEnabled) {
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("🔔 Nouvelle offre Je Gjobe !", {
-              body: `${newJob.title}\n${newJob.price} - ${newJob.distance} de votre position.`
-            });
-          } else {
-             alert(`🔔 Nouvelle offre détectée pour vous !\n\n${newJob.title}\n${newJob.category} - ${newJob.price}\nÀ ${newJob.distance} de votre position.`);
-          }
+    if (currentView !== 'home' || jobs.length === 0) return;
+    const top = jobs[0];
+    if (lastJobIdRef.current === top.id) return;
+    if (lastJobIdRef.current !== null && notificationsEnabled) {
+      const matchesPrice = top.numericPrice <= filterMaxPrice;
+      const matchesDistance = top.numericDistance <= filterMaxDistance;
+      const matchesAvailability = filterAvailability === 'all' || top.availability === filterAvailability;
+      if (matchesPrice && matchesDistance && matchesAvailability) {
+        if ("Notification" in window && Notification.permission === "granted") {
+          new Notification("🔔 Nouvelle offre Je Gjobe !", {
+            body: `${top.title}\n${formatPrice(top.numericPrice)}${top.distance ? ' - ' + top.distance : ''}`
+          });
         }
       }
-
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(intervalId);
-  }, [selectedCategory, filterMaxPrice, filterMaxDistance, filterAvailability, filterDate, currentView, coords, locationName, loadingJobs, notificationsEnabled]);
+    }
+    lastJobIdRef.current = top.id;
+  }, [jobs, currentView, notificationsEnabled, filterMaxPrice, filterMaxDistance, filterAvailability]);
 
 
   // --- API Functions ---
@@ -555,133 +466,8 @@ const App = () => {
     }
   };
 
-  const fetchJobs = async (lat, lng, category) => {
-    setLoadingJobs(true);
-    try {
-      const categoryLabel = CATEGORIES.find(c => c.id === category)?.label || "Services divers";
-      const profileContext = `
-        Profil jobber:
-        - Métier principal: ${profile.jobTitle || 'Non renseigné'}
-        - Compétences: ${(profile.skills && profile.skills.length > 0) ? profile.skills.join(', ') : 'Non renseigné'}
-        - Zone / ville préférée: ${profile.locationPreference || 'Basée sur la géolocalisation actuelle'}
-        - Disponibilités: ${profile.availability || 'Non renseigné'}
-      `;
-
-      const prompt = `
-        Génère 6 annonces de jobs pour une app style AlloVoisins.
-        Catégorie: ${category === 'all' ? 'Divers (Plombier, Ménage, etc.)' : categoryLabel}.
-        Lieu: Lat ${lat}, Lng ${lng}. Rayon < 30km.
-        Langue: Français.
-        Devise: les montants sont en euros (base). Utilise numericPrice en euros (nombre entre 20 et 200). L'affichage sera converti automatiquement (ex: 75 EUR = 48 750 XOF).
-        Certaines annonces doivent être marquées comme premium (isPremium = true).
-        
-        Les annonces doivent être prioritairement pertinentes pour ce profil jobber:
-        ${profileContext}
-
-        Si des informations de profil ne sont pas renseignées, génère des annonces générales mais réalistes.
-
-        JSON uniquement, tableau d'objets:
-        {
-          "id": "uuid",
-          "title": "Titre",
-          "description": "Courte description",
-          "price": "${formatPrice(20)}",
-          "numericPrice": 20,
-          "location": "Ville",
-          "distance": "2.5 km",
-          "numericDistance": 2.5,
-          "postedTime": "Il y a 2h",
-          "category": "Catégorie",
-          "availability": "Semaine",
-          "contactEmail": "email@example.com",
-          "isPremium": false
-        }
-      `;
-      let data = [];
-
-      const systemJobs = "Tu es un générateur d'annonces pour une application type AlloVoisins. Tu réponds STRICTEMENT en JSON valide, sans texte autour.";
-      try {
-        if (AI_PROVIDER === 'kimi' && KIMI_API_KEY) {
-          const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${KIMI_API_KEY}`
-            },
-            body: JSON.stringify({
-              model: KIMI_MODEL,
-              temperature: 0.4,
-              messages: [
-                { role: 'system', content: systemJobs },
-                { role: 'user', content: prompt }
-              ]
-            })
-          });
-          const json = await res.json();
-          const content = json?.choices?.[0]?.message?.content || '';
-          if (content) data = JSON.parse(content);
-        } else if (AI_PROVIDER === 'anthropic' && ANTHROPIC_API_KEY) {
-          const res = await fetch('https://api.anthropic.com/v1/messages', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'x-api-key': ANTHROPIC_API_KEY,
-              'anthropic-version': '2023-06-01'
-            },
-            body: JSON.stringify({
-              model: ANTHROPIC_MODEL,
-              max_tokens: 4096,
-              system: systemJobs,
-              messages: [{ role: 'user', content: prompt }]
-            })
-          });
-          const json = await res.json();
-          const textBlock = json?.content?.find?.((b) => b.type === 'text');
-          const content = textBlock?.text || '';
-          if (content) data = JSON.parse(content);
-        }
-      } catch (parseErr) {
-        console.warn("API response was not valid JSON or cut off, falling back to mock data.", parseErr);
-        throw parseErr;
-      }
-
-      if (!Array.isArray(data)) throw new Error("Response is not an array");
-      setJobs(data); 
-    } catch (error) {
-      console.warn("Job generation failed or incomplete, using fallback data.");
-      const fallbackJobs = Array.from({ length: 6 }).map((_, i) => {
-        let catKey = category;
-        if (catKey === 'all') {
-             const keys = CATEGORIES.map(c => c.id).filter(id => id !== 'all');
-             catKey = keys[Math.floor(Math.random() * keys.length)];
-        }
-        
-        const titles = MOCK_TITLES[catKey] || MOCK_TITLES.default;
-        const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-        const categoryObj = CATEGORIES.find(c => c.id === catKey);
-        
-        return {
-          id: `fallback-${Date.now()}-${i}`,
-          title: randomTitle,
-          description: "Annonce (Mode hors ligne). La description détaillée n'a pas pu être chargée.",
-          price: formatPrice(20 + i * 5),
-          numericPrice: 20 + i * 5,
-          location: locationName.split(',')[0] || "Quartier",
-          distance: `${(i + 1) * 1.5} km`,
-          numericDistance: (i + 1) * 1.5,
-          postedTime: "Il y a 1h",
-          category: categoryObj ? categoryObj.label : "Autre",
-          availability: "Semaine",
-          contactEmail: `client-${Date.now()}-${i}@email.com`,
-          isPremium: Math.random() > 0.8,
-          tags: []
-        };
-      });
-      setJobs(fallbackJobs);
-    } finally {
-      setLoadingJobs(false);
-    }
-  };
+  // Bouton "Rafraichir" : delegue au hook useJobs
+  const fetchJobs = async () => { await refetchJobs(); };
 
   const handleApply = (e, jobId) => {
     e.stopPropagation();
@@ -693,63 +479,31 @@ const App = () => {
     setCancelingJobId(jobId);
   };
 
-  const confirmApply = () => {
-    if (confirmingJobId) {
-      setAppliedJobs(prev => {
-        const next = new Set(prev);
-        next.add(confirmingJobId);
-        return next;
-      });
-      
-      const job = jobs.find(j => j.id === confirmingJobId);
-      if (job) {
-        setAppliedJobHistory(prev => [...prev, job]);
-      }
-
-      setConfirmingJobId(null);
+  const confirmApply = async () => {
+    if (!confirmingJobId) return;
+    try {
+      await applyToJob(confirmingJobId);
+    } catch (err: any) {
+      alert(err?.message ?? 'Impossible de postuler');
     }
+    setConfirmingJobId(null);
   };
 
-  const confirmCancel = () => {
-    if (cancelingJobId) {
-      setAppliedJobs(prev => {
-        const next = new Set(prev);
-        next.delete(cancelingJobId);
-        return next;
-      });
-
-      setAppliedJobHistory(prev => prev.filter(job => job.id !== cancelingJobId));
-      setCancelingJobId(null);
+  const confirmCancel = async () => {
+    if (!cancelingJobId) return;
+    try {
+      await cancelApplication(cancelingJobId);
+    } catch (err: any) {
+      alert(err?.message ?? 'Impossible d\'annuler');
     }
+    setCancelingJobId(null);
   };
 
-  const handleCompleteMission = (jobId, jobTitle) => {
-    setCompletedJobIds(prev => {
-        const next = new Set(prev);
-        next.add(jobId);
-        return next;
-    });
-
-    const randomComment = MOCK_REVIEWS_COMMENTS[Math.floor(Math.random() * MOCK_REVIEWS_COMMENTS.length)];
-    const randomClient = MOCK_CLIENT_NAMES[Math.floor(Math.random() * MOCK_CLIENT_NAMES.length)];
-    const randomRating = Math.random() > 0.3 ? 5 : 4; 
-
-    const newReview = {
-        id: `review-${Date.now()}`,
-        clientName: randomClient,
-        rating: randomRating,
-        comment: randomComment,
-        date: new Date().toLocaleDateString('fr-FR'),
-        jobTitle: jobTitle
-    };
-
-    setProfile(prev => ({
-        ...prev,
-        reviews: [newReview, ...prev.reviews],
-        completedMissions: prev.completedMissions + 1
-    }));
-    
-    alert(`👏 Mission terminée !\n\n${randomClient} vous a laissé un avis ${randomRating} étoiles :\n"${randomComment}"`);
+  // TODO Phase 3.4 : la completion sera declenchee par le proprietaire du job
+  // (status='completed' coté DB) + creation d'un avis dans la table reviews.
+  // Pour l'instant : feedback UI simple, sans persistance reelle.
+  const handleCompleteMission = (_jobId, jobTitle) => {
+    alert(`Mission "${jobTitle}" marquee terminee. La validation cote proprietaire arrive en Phase 3.4.`);
   };
 
   const handlePaymentSuccess = () => {
@@ -762,58 +516,61 @@ const App = () => {
     alert(`📧 Contact de l'annonceur :\n\n${job.contactEmail || 'Veuillez utiliser le chat pour contacter cet utilisateur.'}`);
   };
 
-  const handleViewProfile = (e, job) => {
+  const handleViewProfile = async (e, job) => {
     e.stopPropagation();
-    
-    const mockProfile = {
-        name: MOCK_CLIENT_NAMES[Math.floor(Math.random() * MOCK_CLIENT_NAMES.length)],
-        email: job.contactEmail || 'contact@example.com',
-        skills: [job.category, 'Bricolage', 'Jardinage'], 
-        bio: `Bonjour, je suis un voisin passionné par le service. Je propose régulièrement des annonces dans la catégorie ${job.category} sur ${job.location}. N'hésitez pas à me contacter !`,
-        isCreated: true,
-        isPremium: job.isPremium || false,
-        reviews: [],
-        completedMissions: Math.floor(Math.random() * 50) + 5
-    };
-
-    const numReviews = Math.floor(Math.random() * 6) + 2; 
-    for(let i=0; i<numReviews; i++) {
-        mockProfile.reviews.push({
-             id: `mock-review-${Date.now()}-${i}`,
-             clientName: MOCK_CLIENT_NAMES[Math.floor(Math.random() * MOCK_CLIENT_NAMES.length)],
-             rating: Math.random() > 0.2 ? 5 : 4,
-             comment: MOCK_REVIEWS_COMMENTS[Math.floor(Math.random() * MOCK_REVIEWS_COMMENTS.length)],
-             date: `Il y a ${Math.floor(Math.random() * 10) + 1} mois`,
-             jobTitle: i % 2 === 0 ? job.category : 'Service divers'
-        });
+    if (!job.userId) {
+      alert('Profil indisponible pour cette annonce.');
+      return;
     }
-
-    setSelectedPublicProfile(mockProfile);
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', job.userId)
+      .maybeSingle();
+    if (error || !data) {
+      alert('Profil introuvable.');
+      return;
+    }
+    setSelectedPublicProfile({
+      name: data.name ?? 'Utilisateur',
+      email: data.email ?? '',
+      skills: data.skills ?? [],
+      bio: data.bio ?? '',
+      isCreated: true,
+      isPremium: !!data.is_premium,
+      reviews: [],
+      completedMissions: data.completed_missions ?? 0,
+      profilePicture: data.profile_picture_url ?? undefined,
+    });
     handleNavigate('public_profile');
   };
 
-  const handleCreateJob = (jobData) => {
-    const priceEur = localToEur(jobData.price);
-    const newJob = {
-        id: `local-${Date.now()}`,
+  const handleCreateJob = async (jobData) => {
+    try {
+      const priceEur = localToEur(jobData.price);
+      // Upload photos avant insert (pour avoir les URLs publiques)
+      let photoUrls: string[] = [];
+      if (jobData.photos && jobData.photos.length > 0) {
+        if (!userId) throw new Error("Connectez-vous via Telegram pour ajouter des photos.");
+        photoUrls = await uploadJobPhotos(jobData.photos, userId);
+      }
+      await createJob({
         title: jobData.title,
         description: jobData.description,
-        price: formatPrice(priceEur),
-        numericPrice: priceEur,
-        location: jobData.location,
-        distance: "0.1 km", 
-        numericDistance: 0.1,
-        postedTime: "À l'instant",
         category: jobData.category,
+        city: jobData.location,
+        priceEur,
         availability: jobData.availability,
-        contactEmail: profile.email || "contact@jobber.com",
-        isPremium: false, 
-        tags: jobData.tags || []
-    };
-    
-    setJobs(prev => [newJob, ...prev]);
-    alert("Votre annonce a été publiée avec succès !");
-    handleHomeClick();
+        tags: jobData.tags || [],
+        photos: photoUrls,
+        lat: coords?.lat ?? null,
+        lng: coords?.lng ?? null,
+      });
+      alert("Votre annonce a été publiée avec succès !");
+      handleHomeClick();
+    } catch (err: any) {
+      alert(err?.message ?? "Publication impossible. Vous devez etre connecte via Telegram.");
+    }
   };
 
   // --- UI Components ---
@@ -1124,8 +881,20 @@ const App = () => {
     const [availability, setAvailability] = useState(AVAILABILITY_OPTIONS[1].id);
     const [tags, setTags] = useState([]);
     const [currentTag, setCurrentTag] = useState('');
+    const [photos, setPhotos] = useState<File[]>([]);
+    const [submitting, setSubmitting] = useState(false);
+    const photoUrls = photos.map(f => URL.createObjectURL(f));
+    useEffect(() => () => { photoUrls.forEach(URL.revokeObjectURL); }, []);
     // Remove explicit Record type to avoid comma in generic type syntax issues in parsing
     const [errors, setErrors] = useState<any>({});
+
+    const handlePhotosPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const picked = Array.from(e.target.files ?? []);
+      e.target.value = '';
+      const remaining = Math.max(0, 5 - photos.length);
+      setPhotos(prev => [...prev, ...picked.slice(0, remaining)]);
+    };
+    const removePhoto = (idx: number) => setPhotos(prev => prev.filter((_, i) => i !== idx));
 
     const handleAddTag = () => {
         const trimmed = currentTag.trim();
@@ -1146,7 +915,7 @@ const App = () => {
         }
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         const newErrors: any = {};
         if (!title.trim()) newErrors.title = "Le titre est requis";
         if (!description.trim()) newErrors.description = "La description est requise";
@@ -1158,15 +927,21 @@ const App = () => {
             return;
         }
 
-        handleCreateJob({
-            title,
-            category,
-            description,
-            price,
-            location,
-            availability,
-            tags
-        });
+        setSubmitting(true);
+        try {
+          await handleCreateJob({
+              title,
+              category,
+              description,
+              price,
+              location,
+              availability,
+              tags,
+              photos,
+          });
+        } finally {
+          setSubmitting(false);
+        }
     };
 
     return (
@@ -1287,6 +1062,38 @@ const App = () => {
                    </div>
                 </div>
 
+                {/* Photos */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Photos (optionnel, max 5)</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {photoUrls.map((url, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(idx)}
+                          className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+                    {photos.length < 5 && (
+                      <label className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 text-gray-400">
+                        <Camera size={24} />
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          multiple
+                          className="hidden"
+                          onChange={handlePhotosPicked}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400">JPEG / PNG / WebP - 5 Mo max par photo</p>
+                </div>
+
                 {/* Availability */}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Disponibilité souhaitée</label>
@@ -1314,12 +1121,13 @@ const App = () => {
                     >
                         Annuler
                     </button>
-                    <button 
+                    <button
                         onClick={handleSubmit}
-                        className="flex-1 py-3 px-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200 dark:shadow-none flex items-center justify-center gap-2"
+                        disabled={submitting}
+                        className="flex-1 py-3 px-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200 dark:shadow-none flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        <Check size={20} />
-                        Publier l'annonce
+                        {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
+                        {submitting ? 'Publication…' : "Publier l'annonce"}
                     </button>
                 </div>
 
@@ -1599,6 +1407,27 @@ const App = () => {
 
   const ProfileView = () => {
     const [skillInput, setSkillInput] = useState('');
+    const [avatarUploading, setAvatarUploading] = useState(false);
+
+    const handleAvatarPicked = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file) return;
+      if (!userId) {
+        alert('Connectez-vous via Telegram pour changer votre photo de profil.');
+        return;
+      }
+      setAvatarUploading(true);
+      try {
+        const url = await uploadAvatar(file, userId);
+        setProfile(prev => ({ ...prev, profilePicture: url, isCreated: true }));
+      } catch (err: any) {
+        alert(err?.message ?? 'Upload impossible.');
+      } finally {
+        setAvatarUploading(false);
+      }
+    };
+
     const [form, setForm] = useState(() => ({
       name: profile.name || '',
       email: profile.email || '',
@@ -1671,9 +1500,16 @@ const App = () => {
                <User size={40} />
              </div>
            )}
-           <button className="absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full hover:bg-orange-600 transition-colors shadow-md">
-             <Camera size={14} />
-           </button>
+           <label className={`absolute bottom-0 right-0 bg-orange-500 text-white p-2 rounded-full transition-colors shadow-md ${avatarUploading ? 'opacity-60 cursor-wait' : 'hover:bg-orange-600 cursor-pointer'}`}>
+             {avatarUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+             <input
+               type="file"
+               accept="image/png,image/jpeg,image/webp"
+               className="hidden"
+               disabled={avatarUploading}
+               onChange={handleAvatarPicked}
+             />
+           </label>
         </div>
         
         <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">{profile.name || "Utilisateur"}</h2>

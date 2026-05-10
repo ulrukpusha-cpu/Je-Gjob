@@ -11,6 +11,7 @@
     "bot": "node telegram-bot.mjs"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
     "lucide-react": "^0.574.0",
     "node-telegram-bot-api": "^0.67.0",
     "react": "18.3.1",
