@@ -1,0 +1,301 @@
+// Supabase Edge Function (Deno) - Webhook Telegram pour Je Gjobe
+//
+// Remplace le polling node-telegram-bot-api precedemment heberge sur Railway.
+// Telegram POST chaque update directement sur cette URL.
+//
+// Deploy : supabase functions deploy telegram-bot --no-verify-jwt
+// Secrets requis :
+//   TELEGRAM_BOT_TOKEN              (token bot)
+//   TELEGRAM_WEBHOOK_SECRET         (chaine aleatoire, ex: openssl rand -hex 32)
+// Secrets optionnels :
+//   KIMI_API_KEY  + KIMI_BASE_URL + KIMI_MODEL    (chatbot IA Moonshot/NVIDIA)
+//   ANTHROPIC_API_KEY + ANTHROPIC_MODEL           (chatbot IA Claude, fallback)
+//   TELEGRAM_PAYMENT_PROVIDER_TOKEN               (paiement Telegram Stars/XOF)
+//
+// Apres deploy, enregistrer le webhook une fois :
+//   curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=<FN_URL>&secret_token=<SECRET>&drop_pending_updates=true"
+
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+const WEBHOOK_SECRET     = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
+const SUPABASE_URL       = Deno.env.get('SUPABASE_URL')!;
+const SERVICE_ROLE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+const KIMI_API_KEY  = Deno.env.get('KIMI_API_KEY');
+const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL') ?? 'https://api.moonshot.ai/v1').replace(/\/$/, '');
+const KIMI_MODEL    = Deno.env.get('KIMI_MODEL') ?? 'kimi-k2-turbo-preview';
+
+const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+const ANTHROPIC_MODEL   = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
+
+const PAYMENT_PROVIDER_TOKEN = Deno.env.get('TELEGRAM_PAYMENT_PROVIDER_TOKEN');
+
+// ===========================================================================
+// Telegram Bot API helpers
+// ===========================================================================
+async function tg<T = any>(method: string, body: Record<string, unknown>): Promise<T> {
+  const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/${method}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) console.error(`tg ${method} ${res.status}`, await res.text().catch(() => ''));
+  return res.json() as Promise<T>;
+}
+
+const sendMessage = (chat_id: number, text: string, extra: Record<string, unknown> = {}) =>
+  tg('sendMessage', { chat_id, text, ...extra });
+
+const sendTyping = (chat_id: number) =>
+  tg('sendChatAction', { chat_id, action: 'typing' });
+
+// ===========================================================================
+// Reponses statiques
+// ===========================================================================
+const WELCOME =
+  "👋 Bienvenue sur le bot *Je Gjobe*.\n\n" +
+  "Je peux t'aider à trouver ou proposer des petits boulots, " +
+  "améliorer ton profil, et rédiger de bonnes annonces.\n\n" +
+  "Tape /help pour voir les commandes, ou pose ta question directement.";
+
+const HELP =
+  "🧾 *Commandes Je Gjobe*\n\n" +
+  "/start - Présentation\n" +
+  "/help - Cette aide\n" +
+  "/exemple_annonce - Exemple d'annonce bien rédigée\n" +
+  "/conseils_profil - Conseils pour optimiser ton profil\n\n" +
+  "Tu peux aussi écrire ta question (sans /) - l'IA te répondra.";
+
+const SAMPLE_AD =
+  "📌 *Exemple d'annonce Je Gjobe*\n\n" +
+  "*Titre* : Ménage appartement 2h - Centre-ville\n\n" +
+  "*Description* :\n" +
+  "Je recherche une personne sérieuse et ponctuelle pour un ménage complet " +
+  "d'un appartement de 45m² (salon, cuisine, salle de bain) une fois par semaine.\n\n" +
+  "*Détails* :\n" +
+  "• Durée : 2 heures\n" +
+  "• Jour : samedi matin de préférence\n" +
+  "• Matériel fourni sur place\n\n" +
+  "*Tarif* : 30€ pour la prestation.\n\n" +
+  "N'hésite pas à adapter cet exemple avec tes propres informations.";
+
+const PROFILE_TIPS =
+  "✨ *Conseils pour un bon profil Je Gjobe*\n\n" +
+  "1️⃣ Ajoute une photo de profil claire et professionnelle.\n" +
+  "2️⃣ Décris précisément tes compétences (ex : ménage, baby-sitting, plomberie...).\n" +
+  "3️⃣ Indique ta zone géographique et tes disponibilités.\n" +
+  "4️⃣ Mets en avant tes expériences ou avis clients si tu en as.\n" +
+  "5️⃣ Soigne l'orthographe, ça donne confiance.\n\n" +
+  "Tu peux aussi m'envoyer la description de ton profil, et je t'aiderai à l'améliorer.";
+
+// ===========================================================================
+// Chatbot IA - Kimi puis fallback Anthropic
+// ===========================================================================
+const SYSTEM_PROMPT =
+  "Tu es l'assistant officiel de l'application Je Gjobe (marketplace de petits boulots " +
+  "en Afrique de l'Ouest : ménage, baby-sitter, plombier, livreur, dev...). " +
+  "Tu aides les utilisateurs à trouver ou proposer des missions, améliorer leur profil, " +
+  "rédiger de bonnes annonces. Réponds en français clair, court, concret.";
+
+async function callKimi(text: string): Promise<string | null> {
+  if (!KIMI_API_KEY) return null;
+  try {
+    const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${KIMI_API_KEY}` },
+      body: JSON.stringify({
+        model: KIMI_MODEL,
+        temperature: 0.4,
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: text },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      console.error('Kimi error', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content?.trim() || null;
+  } catch (e) {
+    console.error('Kimi exception', e);
+    return null;
+  }
+}
+
+async function callAnthropic(text: string): Promise<string | null> {
+  if (!ANTHROPIC_API_KEY) return null;
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: ANTHROPIC_MODEL,
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: text }],
+      }),
+    });
+    if (!res.ok) {
+      console.error('Anthropic error', res.status, await res.text().catch(() => ''));
+      return null;
+    }
+    const data = await res.json();
+    const block = data?.content?.find?.((b: { type: string }) => b.type === 'text');
+    return ((block as { text?: string })?.text ?? '').trim() || null;
+  } catch (e) {
+    console.error('Anthropic exception', e);
+    return null;
+  }
+}
+
+async function callAi(text: string): Promise<string> {
+  const kimi = await callKimi(text);
+  if (kimi) return kimi;
+  const anthropic = await callAnthropic(text);
+  if (anthropic) return anthropic;
+  if (!KIMI_API_KEY && !ANTHROPIC_API_KEY) {
+    return "Le chatbot IA n'est pas configuré (KIMI_API_KEY ou ANTHROPIC_API_KEY manquant côté serveur).";
+  }
+  return "😕 L'IA n'arrive pas à répondre pour l'instant. Réessaie dans un instant.";
+}
+
+// ===========================================================================
+// Activation Premium serveur (Phase 4 - prepare)
+// ===========================================================================
+async function activatePremium(telegramId: number, days = 30) {
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const until = new Date(Date.now() + days * 86400_000).toISOString();
+  const { error } = await supabase
+    .from('profiles')
+    .update({ is_premium: true, premium_until: until })
+    .eq('telegram_id', telegramId);
+  if (error) console.error('activatePremium error', error);
+}
+
+// ===========================================================================
+// Handler principal
+// ===========================================================================
+async function handleUpdate(update: any): Promise<void> {
+  const msg = update.message ?? update.edited_message;
+  if (!msg) return;
+
+  const chatId: number = msg.chat.id;
+  const fromId: number | undefined = msg.from?.id;
+  const text: string = msg.text ?? '';
+
+  // 1. Paiement Telegram réussi
+  if (msg.successful_payment) {
+    if (fromId) await activatePremium(fromId, 30);
+    await sendMessage(
+      chatId,
+      "✅ Paiement reçu ! Ton compte *Je Gjobe Premium* est activé pour 30 jours.",
+      { parse_mode: 'Markdown' },
+    );
+    return;
+  }
+
+  // 2. WebApp data (demande d'abonnement Premium depuis la mini-app)
+  if (msg.web_app_data?.data) {
+    try {
+      const data = JSON.parse(msg.web_app_data.data);
+      if (data.action === 'premium_subscribe') {
+        if (!PAYMENT_PROVIDER_TOKEN) {
+          await sendMessage(chatId, "Le paiement Telegram n'est pas encore configuré côté serveur.");
+          return;
+        }
+        await tg('sendInvoice', {
+          chat_id: chatId,
+          title: 'Je Gjobe Premium',
+          description: 'Abonnement mensuel Je Gjobe Premium (2 000 XOF).',
+          payload: 'premium-pass',
+          provider_token: PAYMENT_PROVIDER_TOKEN,
+          currency: 'XOF',
+          prices: [{ label: 'Je Gjobe Premium - 1 mois', amount: 200000 }],
+        });
+        return;
+      }
+    } catch (e) {
+      console.error('web_app_data parse error', e);
+      await sendMessage(chatId, "Impossible de traiter la demande de paiement.");
+      return;
+    }
+  }
+
+  // 3. Commandes
+  switch (text.split(' ')[0]) {
+    case '/start':           return void await sendMessage(chatId, WELCOME,       { parse_mode: 'Markdown' });
+    case '/help':            return void await sendMessage(chatId, HELP,          { parse_mode: 'Markdown' });
+    case '/exemple_annonce': return void await sendMessage(chatId, SAMPLE_AD,     { parse_mode: 'Markdown' });
+    case '/conseils_profil': return void await sendMessage(chatId, PROFILE_TIPS,  { parse_mode: 'Markdown' });
+  }
+
+  // 4. Texte libre -> IA
+  if (!text || text.startsWith('/')) return;
+  await sendTyping(chatId);
+  const answer = await callAi(text);
+  await sendMessage(chatId, answer);
+}
+
+// ===========================================================================
+// Pre-checkout query (obligatoire pour Telegram payments)
+// ===========================================================================
+async function handlePreCheckout(query: any): Promise<void> {
+  await tg('answerPreCheckoutQuery', { pre_checkout_query_id: query.id, ok: true });
+}
+
+// ===========================================================================
+// HTTP entry point
+// ===========================================================================
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
+
+  // Securité : Telegram envoie le secret dans ce header si setWebhook(secret_token=...)
+  if (WEBHOOK_SECRET) {
+    const got = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
+    if (got !== WEBHOOK_SECRET) return new Response('forbidden', { status: 403 });
+  }
+
+  if (!TELEGRAM_BOT_TOKEN) return new Response('TELEGRAM_BOT_TOKEN missing', { status: 500 });
+
+  let update: any;
+  try {
+    update = await req.json();
+  } catch {
+    return new Response('bad json', { status: 400 });
+  }
+
+  // On repond 200 immediatement pour eviter les retries Telegram,
+  // tout en lancant le handler en arriere-plan (EdgeRuntime.waitUntil sur Supabase).
+  const work = (async () => {
+    try {
+      if (update.pre_checkout_query) {
+        await handlePreCheckout(update.pre_checkout_query);
+        return;
+      }
+      await handleUpdate(update);
+    } catch (err) {
+      console.error('handler error', err);
+    }
+  })();
+
+  // EdgeRuntime existe sur Supabase Edge Functions; sinon on attend simplement.
+  // @ts-ignore
+  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+    // @ts-ignore
+    EdgeRuntime.waitUntil(work);
+  } else {
+    await work;
+  }
+
+  return new Response('ok');
+});

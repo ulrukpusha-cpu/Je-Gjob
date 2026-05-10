@@ -78,3 +78,65 @@ curl -X POST `
 Tu dois recevoir `{"error":"invalid initData: no hash"}` — c'est normal, ça
 prouve juste que la fonction est joignable. Le vrai test se fait depuis
 Telegram Web App via `signInWithTelegram()` côté frontend.
+
+---
+
+### `telegram-bot` (webhook)
+
+Remplace l'ancien bot polling Node hébergé sur Railway. Telegram POST chaque
+update directement sur cette fonction.
+
+#### Déploiement
+
+**Via Dashboard** (le plus simple) :
+1. Edge Functions → **Deploy a new function** → **Via Editor**
+2. Name : `telegram-bot`
+3. **Décoche "Verify JWT"**
+4. Colle le contenu de `supabase/functions/telegram-bot/index.ts`
+5. **Deploy**
+
+#### Secrets à configurer
+
+Dashboard → Edge Functions → **Secrets** :
+
+| Name | Valeur | Obligatoire |
+|---|---|---|
+| `TELEGRAM_BOT_TOKEN` | Token du bot (déjà set pour `verify-telegram-init`) | ✅ |
+| `TELEGRAM_WEBHOOK_SECRET` | Chaîne aléatoire (ex: `openssl rand -hex 32`) | ✅ recommandé |
+| `KIMI_API_KEY` | Clé Moonshot ou NVIDIA NIM | optionnel (chatbot IA) |
+| `KIMI_BASE_URL` | `https://api.moonshot.ai/v1` ou `https://integrate.api.nvidia.com/v1` | optionnel |
+| `KIMI_MODEL` | `kimi-k2-turbo-preview` ou `moonshotai/kimi-k2-instruct` | optionnel |
+| `ANTHROPIC_API_KEY` | Clé Claude | optionnel (fallback IA) |
+| `ANTHROPIC_MODEL` | `claude-sonnet-4-20250514` | optionnel |
+| `TELEGRAM_PAYMENT_PROVIDER_TOKEN` | Token provider XOF (BotFather → Payments) | optionnel (Premium) |
+
+#### Enregistrer le webhook côté Telegram
+
+Une fois déployée, dis à Telegram d'envoyer les updates ici (à faire UNE FOIS) :
+
+```powershell
+$BOT_TOKEN  = "1234567890:AAH..."
+$FN_URL     = "https://dgjbibgubjcfemwosxmw.supabase.co/functions/v1/telegram-bot"
+$SECRET     = "ton-webhook-secret-aleatoire"
+
+curl "https://api.telegram.org/bot$BOT_TOKEN/setWebhook?url=$FN_URL&secret_token=$SECRET&drop_pending_updates=true&allowed_updates=[\"message\",\"edited_message\",\"pre_checkout_query\"]"
+```
+
+Réponse attendue : `{"ok":true,"result":true,"description":"Webhook was set"}`.
+
+Vérifier l'état du webhook :
+```powershell
+curl "https://api.telegram.org/bot$BOT_TOKEN/getWebhookInfo"
+```
+
+Pour le supprimer (revenir au polling) :
+```powershell
+curl "https://api.telegram.org/bot$BOT_TOKEN/deleteWebhook"
+```
+
+#### Migration depuis Railway
+
+Une fois le webhook actif et testé (`/start` répond) :
+1. Suspendre / supprimer le service Railway → plus aucun coût
+2. Le fichier local `telegram-bot.mjs` reste pour dev local éventuel mais
+   n'est plus utilisé en prod.

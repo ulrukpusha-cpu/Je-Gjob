@@ -1357,8 +1357,27 @@ const App = () => {
                </div>
              </div>
              
+             {job.photos && job.photos.length > 0 && (
+               <div className="flex gap-2 mb-3 overflow-x-auto no-scrollbar -mx-1 px-1">
+                 {job.photos.slice(0, 4).map((url, idx) => (
+                   <img
+                     key={idx}
+                     src={url}
+                     alt=""
+                     loading="lazy"
+                     className="w-24 h-24 rounded-lg object-cover border border-gray-100 dark:border-gray-700 shrink-0"
+                   />
+                 ))}
+                 {job.photos.length > 4 && (
+                   <div className="w-24 h-24 rounded-lg bg-gray-100 dark:bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-500 dark:text-gray-400 shrink-0">
+                     +{job.photos.length - 4}
+                   </div>
+                 )}
+               </div>
+             )}
+
              <p className="text-gray-600 dark:text-gray-300 text-sm mb-4 line-clamp-2">{job.description}</p>
-             
+
              <div className="flex items-center justify-between pt-4 border-t border-gray-50 dark:border-gray-700/50">
                 <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
                    <div className="flex items-center gap-1">

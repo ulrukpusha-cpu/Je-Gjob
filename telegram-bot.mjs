@@ -1,3 +1,12 @@
+// ============================================================================
+// DEPRECATED depuis la migration vers Supabase Edge Functions (mai 2026).
+// La logique du bot tourne maintenant en webhook ici :
+//   supabase/functions/telegram-bot/index.ts
+//
+// Ce fichier reste utilisable pour le DEV LOCAL uniquement (npm run bot).
+// Ne PAS le redeployer en prod (Railway / autre) en meme temps que le webhook
+// Supabase, sinon Telegram envoie chaque update en double.
+// ============================================================================
 import TelegramBot from 'node-telegram-bot-api';
 import { readFileSync, existsSync } from 'fs';
 import { fileURLToPath } from 'url';
