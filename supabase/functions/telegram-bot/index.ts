@@ -23,8 +23,12 @@ const SUPABASE_URL       = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const KIMI_API_KEY  = Deno.env.get('KIMI_API_KEY');
-const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL') ?? 'https://api.moonshot.ai/v1').replace(/\/$/, '');
-const KIMI_MODEL    = Deno.env.get('KIMI_MODEL') ?? 'kimi-k2-turbo-preview';
+// Auto-detect NVIDIA NIM (cle "nvapi-...") sinon Moonshot par defaut
+const IS_NVIDIA = !!KIMI_API_KEY && KIMI_API_KEY.startsWith('nvapi-');
+const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL')
+  ?? (IS_NVIDIA ? 'https://integrate.api.nvidia.com/v1' : 'https://api.moonshot.ai/v1')).replace(/\/$/, '');
+const KIMI_MODEL    = Deno.env.get('KIMI_MODEL')
+  ?? (IS_NVIDIA ? 'moonshotai/kimi-k2-instruct' : 'kimi-k2-turbo-preview');
 
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_MODEL   = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
@@ -101,7 +105,7 @@ const SYSTEM_PROMPT =
 async function callKimi(text: string): Promise<string | null> {
   if (!KIMI_API_KEY) return null;
   try {
-    const res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
+    let res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', Authorization: `Bearer ${KIMI_API_KEY}` },
       body: JSON.stringify({
@@ -114,6 +118,31 @@ async function callKimi(text: string): Promise<string | null> {
         ],
       }),
     });
+
+    // NVIDIA NIM peut renvoyer 202 + NVCF-REQID -> polling status/{id}
+    if (res.status === 202) {
+      const reqId = res.headers.get('NVCF-REQID') ?? res.headers.get('nvcf-reqid');
+      if (!reqId) {
+        console.error('Kimi 202 sans NVCF-REQID');
+        return null;
+      }
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1500));
+        res = await fetch(`${KIMI_BASE_URL}/status/${reqId}`, {
+          headers: { Authorization: `Bearer ${KIMI_API_KEY}` },
+        });
+        if (res.status === 200) break;
+        if (res.status !== 202) {
+          console.error('Kimi poll error', res.status, await res.text().catch(() => ''));
+          return null;
+        }
+      }
+      if (res.status !== 200) {
+        console.error('Kimi polling timeout');
+        return null;
+      }
+    }
+
     if (!res.ok) {
       console.error('Kimi error', res.status, await res.text().catch(() => ''));
       return null;
