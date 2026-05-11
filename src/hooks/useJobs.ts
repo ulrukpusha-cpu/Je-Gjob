@@ -140,6 +140,36 @@ export function useJobs({ category, coords }: Filters) {
     return () => { supabase.removeChannel(channel); };
   }, [category]);
 
+  const updateJob = useCallback(async (jobId: string, input: Partial<CreateJobInput>) => {
+    const patch: Record<string, unknown> = {};
+    if (input.title !== undefined)        patch.title       = input.title;
+    if (input.description !== undefined)  patch.description = input.description;
+    if (input.category !== undefined)     patch.category    = input.category;
+    if (input.city !== undefined)         patch.city        = input.city;
+    if (input.priceEur !== undefined)     patch.price_eur   = input.priceEur;
+    if (input.availability !== undefined) patch.availability = input.availability;
+    if (input.tags !== undefined)         patch.tags        = input.tags;
+    if (input.photos !== undefined)       patch.photos      = input.photos;
+    if (input.lat !== undefined)          patch.lat         = input.lat;
+    if (input.lng !== undefined)          patch.lng         = input.lng;
+
+    const { data, error } = await supabase
+      .from('jobs')
+      .update(patch)
+      .eq('id', jobId)
+      .select('*, profiles!jobs_user_id_fkey(email, is_premium)')
+      .single();
+    if (error) throw error;
+    setJobs(prev => prev.map(j => j.id === jobId ? fromDb(data, coordsRef.current) : j));
+    return data;
+  }, []);
+
+  const deleteJob = useCallback(async (jobId: string) => {
+    const { error } = await supabase.from('jobs').delete().eq('id', jobId);
+    if (error) throw error;
+    setJobs(prev => prev.filter(j => j.id !== jobId));
+  }, []);
+
   const createJob = useCallback(async (input: CreateJobInput) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error('Vous devez etre connecte via Telegram pour publier');
@@ -167,5 +197,5 @@ export function useJobs({ category, coords }: Filters) {
     return data;
   }, []);
 
-  return { jobs, isLoading, refetch, createJob };
+  return { jobs, isLoading, refetch, createJob, updateJob, deleteJob };
 }

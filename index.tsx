@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { useSupabaseAuth } from './src/hooks/useSupabaseAuth';
 import { useProfile } from './src/hooks/useProfile';
-import { useJobs } from './src/hooks/useJobs';
+import { useJobs, type JobUI } from './src/hooks/useJobs';
 import { useApplications } from './src/hooks/useApplications';
 import { supabase } from './src/lib/supabase';
 import { uploadAvatar, uploadJobPhotos, uploadPaymentProof } from './src/lib/storage';
@@ -183,7 +183,9 @@ const App = () => {
   // Profile : DB en prod (RLS), localStorage en fallback dev
   const [profile, setProfile] = useProfile(userId);
   // Jobs : Supabase + Realtime
-  const { jobs, isLoading: loadingJobs, refetch: refetchJobs, createJob } = useJobs({ category: selectedCategory, coords });
+  const { jobs, isLoading: loadingJobs, refetch: refetchJobs, createJob, updateJob, deleteJob } = useJobs({ category: selectedCategory, coords });
+  // Mode edition d'un job (null = creation)
+  const [editingJob, setEditingJob] = useState<JobUI | null>(null);
   // Candidatures de l'utilisateur courant
   const { applications, appliedSet: appliedJobs, completedSet: completedJobIds, applyToJob, cancelApplication } = useApplications(userId);
   // Historique = derivé des candidatures (tri par date DESC deja fait par le hook)
@@ -554,13 +556,15 @@ const App = () => {
   const handleCreateJob = async (jobData) => {
     try {
       const priceEur = localToEur(jobData.price);
-      // Upload photos avant insert (pour avoir les URLs publiques)
-      let photoUrls: string[] = [];
-      if (jobData.photos && jobData.photos.length > 0) {
+      // Upload des nouvelles photos (les URLs deja en string sont gardees telles quelles - mode edit)
+      let photoUrls: string[] = jobData.existingPhotos ?? [];
+      const newFiles = (jobData.photos ?? []).filter((p: any) => p instanceof File);
+      if (newFiles.length > 0) {
         if (!userId) throw new Error("Connectez-vous via Telegram pour ajouter des photos.");
-        photoUrls = await uploadJobPhotos(jobData.photos, userId);
+        const uploaded = await uploadJobPhotos(newFiles, userId);
+        photoUrls = [...photoUrls, ...uploaded];
       }
-      await createJob({
+      const payload = {
         title: jobData.title,
         description: jobData.description,
         category: jobData.category,
@@ -571,11 +575,34 @@ const App = () => {
         photos: photoUrls,
         lat: coords?.lat ?? null,
         lng: coords?.lng ?? null,
-      });
-      alert("Votre annonce a été publiée avec succès !");
+      };
+      if (editingJob) {
+        await updateJob(editingJob.id, payload);
+        alert("Annonce mise a jour avec succes !");
+      } else {
+        await createJob(payload);
+        alert("Votre annonce a été publiée avec succès !");
+      }
+      setEditingJob(null);
       handleHomeClick();
     } catch (err: any) {
       alert(err?.message ?? "Publication impossible. Vous devez etre connecte via Telegram.");
+    }
+  };
+
+  const handleEditJob = (e, job) => {
+    e.stopPropagation();
+    setEditingJob(job);
+    handleNavigate('create_job');
+  };
+
+  const handleDeleteJob = async (e, job) => {
+    e.stopPropagation();
+    if (!confirm(`Supprimer definitivement l'annonce "${job.title}" ?`)) return;
+    try {
+      await deleteJob(job.id);
+    } catch (err: any) {
+      alert(err?.message ?? 'Suppression impossible.');
     }
   };
 
@@ -932,6 +959,9 @@ const App = () => {
     </div>
   );
 
+  // Bande verte design (separateur visuel entre sections de la home)
+  const GreenBar = () => <div className="h-[3px] w-full bg-emerald-500/80" />;
+
   const BottomNav = () => (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-t border-gray-200/80 dark:border-gray-700/80 pb-[env(safe-area-inset-bottom)] transition-colors md:max-w-lg md:left-1/2 md:-translate-x-1/2">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-around">
@@ -983,19 +1013,23 @@ const App = () => {
   );
 
   const CreateJobView = () => {
-    const [title, setTitle] = useState('');
-    const [category, setCategory] = useState(CATEGORIES[1].id); // Default to menage
-    const [description, setDescription] = useState('');
-    const [price, setPrice] = useState('');
-    const [location, setLocation] = useState(locationName.includes("Non supporté") ? "" : locationName.split(',')[0]);
-    const [availability, setAvailability] = useState(AVAILABILITY_OPTIONS[1].id);
-    const [tags, setTags] = useState([]);
+    const isEdit = !!editingJob;
+    // Convertit le prix EUR de la DB vers la devise locale pour le champ
+    const seedPrice = editingJob ? String(Math.round(editingJob.numericPrice * (currency.code === 'XOF' ? RATE_EUR_TO_XOF : 1))) : '';
+    const [title, setTitle] = useState(editingJob?.title ?? '');
+    const [category, setCategory] = useState(editingJob?.category ?? CATEGORIES[1].id);
+    const [description, setDescription] = useState(editingJob?.description ?? '');
+    const [price, setPrice] = useState(seedPrice);
+    const [location, setLocation] = useState(editingJob?.location ?? (locationName.includes("Non supporté") ? "" : locationName.split(',')[0]));
+    const [availability, setAvailability] = useState(editingJob?.availability ?? AVAILABILITY_OPTIONS[1].id);
+    const [tags, setTags] = useState<string[]>(editingJob?.tags ?? []);
     const [currentTag, setCurrentTag] = useState('');
     const [photos, setPhotos] = useState<File[]>([]);
+    // Photos deja uploadees (URLs Storage) - en mode edit, garder ou supprimer
+    const [existingPhotos, setExistingPhotos] = useState<string[]>(editingJob?.photos ?? []);
     const [submitting, setSubmitting] = useState(false);
     const photoUrls = photos.map(f => URL.createObjectURL(f));
     useEffect(() => () => { photoUrls.forEach(URL.revokeObjectURL); }, []);
-    // Remove explicit Record type to avoid comma in generic type syntax issues in parsing
     const [errors, setErrors] = useState<any>({});
 
     const handlePhotosPicked = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1048,17 +1082,21 @@ const App = () => {
               availability,
               tags,
               photos,
+              existingPhotos,
           });
         } finally {
           setSubmitting(false);
         }
     };
 
+    const removeExistingPhoto = (idx: number) =>
+      setExistingPhotos(prev => prev.filter((_, i) => i !== idx));
+
     return (
         <div className="max-w-2xl mx-auto px-4 py-8 pb-20">
             <h2 className="text-2xl font-bold mb-6 text-gray-800 dark:text-white flex items-center gap-2">
                <PlusCircle className="text-orange-500" />
-               Publier une annonce
+               {isEdit ? "Modifier l'annonce" : 'Publier une annonce'}
             </h2>
 
             <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
@@ -1176,8 +1214,20 @@ const App = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Photos (optionnel, max 5)</label>
                   <div className="flex flex-wrap gap-2 mb-2">
+                    {existingPhotos.map((url, idx) => (
+                      <div key={`exist-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeExistingPhoto(idx)}
+                          className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 hover:bg-black/80"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
                     {photoUrls.map((url, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
+                      <div key={`new-${idx}`} className="relative w-20 h-20 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600">
                         <img src={url} alt="" className="w-full h-full object-cover" />
                         <button
                           type="button"
@@ -1188,7 +1238,7 @@ const App = () => {
                         </button>
                       </div>
                     ))}
-                    {photos.length < 5 && (
+                    {(existingPhotos.length + photos.length) < 5 && (
                       <label className="w-20 h-20 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center cursor-pointer hover:border-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/10 text-gray-400">
                         <Camera size={24} />
                         <input
@@ -1225,8 +1275,8 @@ const App = () => {
                 </div>
 
                 <div className="pt-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">
-                    <button 
-                        onClick={handleHomeClick}
+                    <button
+                        onClick={() => { setEditingJob(null); handleHomeClick(); }}
                         className="flex-1 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                         Annuler
@@ -1237,7 +1287,7 @@ const App = () => {
                         className="flex-1 py-3 px-4 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-colors shadow-lg shadow-orange-200 dark:shadow-none flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {submitting ? <Loader2 size={20} className="animate-spin" /> : <Check size={20} />}
-                        {submitting ? 'Publication…' : "Publier l'annonce"}
+                        {submitting ? (isEdit ? 'Sauvegarde…' : 'Publication…') : (isEdit ? 'Sauvegarder' : "Publier l'annonce")}
                     </button>
                 </div>
 
@@ -1499,10 +1549,26 @@ const App = () => {
                       Voir profil
                    </button>
                 </div>
-                
+
                 <div className="flex gap-2">
-                   {appliedJobs.has(job.id) ? (
-                     <button 
+                   {userId && job.userId === userId ? (
+                     <>
+                       <button
+                         onClick={(e) => handleEditJob(e, job)}
+                         className="px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium rounded-xl text-sm hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+                       >
+                         Modifier
+                       </button>
+                       <button
+                         onClick={(e) => handleDeleteJob(e, job)}
+                         className="px-3 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-medium rounded-xl text-sm hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                         title="Supprimer"
+                       >
+                         <X size={16} />
+                       </button>
+                     </>
+                   ) : appliedJobs.has(job.id) ? (
+                     <button
                        onClick={(e) => handleCancelApplication(e, job.id)}
                        className="px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 font-medium rounded-xl text-sm flex items-center gap-1 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors group/btn"
                      >
@@ -1511,13 +1577,13 @@ const App = () => {
                      </button>
                    ) : (
                      <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={(e) => handleContact(e, job)}
                           className="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                         >
                           <MessageSquareQuote size={18} />
                         </button>
-                        <button 
+                        <button
                           onClick={(e) => handleApply(e, job.id)}
                           className="px-4 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 font-medium rounded-xl text-sm hover:bg-orange-500 dark:hover:bg-gray-200 transition-colors"
                         >
@@ -2026,10 +2092,14 @@ const App = () => {
       
       {currentView === 'home' && (
         <>
+          <GreenBar />
           <HomeLogoBlock />
+          <GreenBar />
           <LocationHeader />
           <CategoryFilter />
+          <GreenBar />
           <JobList />
+          <GreenBar />
         </>
       )}
 
