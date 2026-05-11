@@ -506,9 +506,12 @@ const App = () => {
     alert(`Mission "${jobTitle}" marquee terminee. La validation cote proprietaire arrive en Phase 3.4.`);
   };
 
+  // Le Premium ne s'active JAMAIS cote client. Le bot Telegram (Edge Function)
+  // ecoute successful_payment et UPDATE profiles.is_premium via service_role.
+  // Le frontend ecoute la modif en Realtime via useProfile et rafraichit l'UI.
   const handlePaymentSuccess = () => {
-    setProfile(prev => ({ ...prev, isPremium: true }));
     setShowPaymentModal(false);
+    alert("Paiement enregistre. Ton statut Premium s'activera dans quelques secondes.");
   };
 
   const handleContact = (e, job) => {

@@ -140,3 +140,67 @@ Une fois le webhook actif et testé (`/start` répond) :
 1. Suspendre / supprimer le service Railway → plus aucun coût
 2. Le fichier local `telegram-bot.mjs` reste pour dev local éventuel mais
    n'est plus utilisé en prod.
+
+---
+
+## Phase 4 — Premium serveur
+
+L'activation Premium se fait UNIQUEMENT côté serveur :
+1. L'utilisateur paie via Telegram (sendInvoice → succès)
+2. Telegram envoie `successful_payment` au webhook bot
+3. La fonction `telegram-bot` appelle `activatePremium(telegram_id)` avec
+   la `service_role_key` (bypass RLS, bypass trigger protect_premium_columns)
+4. Realtime notifie le frontend → badge Premium apparaît instantanément
+
+### Activer les paiements Telegram (provider)
+
+Telegram Payments demande un **provider token** (le bot "facture" via un fournisseur).
+
+**Option 1 : Telegram Stars (le plus simple)**
+
+Stars est la monnaie native Telegram, intégrée, **pas besoin de provider externe**.
+Il faut :
+1. Modifier le code de `sendInvoice` dans `telegram-bot/index.ts` pour utiliser
+   `currency: 'XTR'` (Telegram Stars) au lieu de `'XOF'`
+2. Le `provider_token` n'est PAS requis pour Stars
+3. Les amounts sont exprimés en Stars (1 Star ≈ 0.013 USD environ)
+
+Exemple :
+```ts
+await tg('sendInvoice', {
+  chat_id: chatId,
+  title: 'Je Gjobe Premium',
+  description: 'Abonnement mensuel',
+  payload: 'premium-pass',
+  currency: 'XTR',
+  prices: [{ label: 'Premium - 1 mois', amount: 100 }], // 100 Stars
+  // pas de provider_token
+});
+```
+
+**Option 2 : Provider XOF / EUR (Stripe, etc.)**
+
+1. Sur Telegram, ouvre `@BotFather`
+2. `/mybots` → choisis ton bot → **Payments**
+3. Choisis un provider compatible avec ton pays/devise
+4. Suis l'assistant → tu obtiens un `provider_token` (ex: `1234567:TEST:abc...`)
+5. Mets-le dans Edge Function Secrets : `TELEGRAM_PAYMENT_PROVIDER_TOKEN`
+6. Redéploie `telegram-bot` (ou attends une nouvelle invocation)
+
+### Test du flow Premium
+
+1. Dans la WebApp : clique "Passer Premium"
+2. Le bot reçoit `web_app_data.action === 'premium_subscribe'` → `sendInvoice`
+3. Tu paies dans Telegram (mode test si provider est en mode test)
+4. Telegram envoie `pre_checkout_query` → le bot répond OK
+5. Paiement traité → Telegram envoie `successful_payment`
+6. Bot UPDATE `profiles.is_premium=true, premium_until=now()+30d`
+7. Frontend reçoit l'UPDATE en Realtime → badge Premium apparaît automatiquement
+
+### Djamo / Wave (paiements Mobile Money)
+
+Hors Telegram. Eux n'envoient pas `successful_payment`. Pour les supporter :
+1. Configurer un webhook côté Djamo/Wave qui pointe vers une nouvelle Edge Function
+   `payment-callback` qui appelle `activatePremium()` après vérification de signature
+2. Stocker le `telegram_id` dans la metadata de la transaction pour identifier l'user
+3. (À implémenter ultérieurement)

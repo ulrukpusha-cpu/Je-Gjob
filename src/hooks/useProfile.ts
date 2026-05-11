@@ -118,6 +118,30 @@ export function useProfile(userId: string | null): [Profile, Setter] {
     };
   }, [userId]);
 
+  // Realtime : ecoute les UPDATE sur sa propre ligne (utile pour is_premium qui
+  // est ecrit par le bot serveur apres paiement Telegram - activation auto en UI)
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`profile-${userId}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${userId}` },
+        (payload) => {
+          const data = payload.new as any;
+          // Ne pas ecraser si on a une edition locale en cours - merge uniquement
+          // les champs serveur-only (is_premium, premium_until, completed_missions).
+          setProfileState(prev => ({
+            ...prev,
+            isPremium: data.is_premium ?? prev.isPremium,
+            completedMissions: data.completed_missions ?? prev.completedMissions,
+          }));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [userId]);
+
   // Persist (LS toujours + DB si auth)
   const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
