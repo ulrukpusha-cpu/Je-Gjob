@@ -66,3 +66,23 @@ export async function uploadJobPhoto(file: File, userId: string): Promise<string
 export async function uploadJobPhotos(files: File[], userId: string): Promise<string[]> {
   return Promise.all(files.map(f => uploadJobPhoto(f, userId)));
 }
+
+/**
+ * Upload une preuve de paiement Wave/Djamo.
+ * Bucket PRIVE, retourne le path interne (pas une URL publique). L'admin recevra
+ * un signed URL genere par l'Edge Function submit-payment-proof.
+ */
+export async function uploadPaymentProof(file: File, userId: string): Promise<string> {
+  validate(file, MAX_JOB_PHOTO_BYTES);
+  const fname = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${safeExt(file)}`;
+  const path = `${userId}/${fname}`;
+  const { error } = await supabase.storage
+    .from('payment-proofs')
+    .upload(path, file, {
+      upsert: false,
+      cacheControl: '3600',
+      contentType: file.type,
+    });
+  if (error) throw error;
+  return path;
+}

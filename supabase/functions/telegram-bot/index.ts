@@ -34,6 +34,8 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_MODEL   = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
 
 // (TELEGRAM_PAYMENT_PROVIDER_TOKEN n'est plus utilise : Stars = paiement natif sans provider)
+const ADMIN_IDS = (Deno.env.get('ADMIN_TELEGRAM_IDS') ?? '')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
 // ===========================================================================
 // Telegram Bot API helpers
@@ -280,6 +282,105 @@ async function handlePreCheckout(query: any): Promise<void> {
 }
 
 // ===========================================================================
+// Callback query : boutons inline admin sur les preuves de paiement Wave/Djamo
+// ===========================================================================
+async function handleCallbackQuery(cb: any): Promise<void> {
+  const data: string = cb.data ?? '';
+  const fromId: number = cb.from?.id;
+  const msg = cb.message;
+  const chatId: number = msg?.chat?.id;
+  const messageId: number = msg?.message_id;
+
+  // Securite : seuls les admins declares peuvent traiter
+  if (!ADMIN_IDS.includes(String(fromId))) {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: 'Action reservee aux admins.', show_alert: true });
+    return;
+  }
+
+  // Format attendu : proof:approve:<uuid>  ou  proof:reject:<uuid>
+  const m = /^proof:(approve|reject):([0-9a-f-]{36})$/i.exec(data);
+  if (!m) {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id });
+    return;
+  }
+  const action = m[1] as 'approve' | 'reject';
+  const proofId = m[2];
+
+  const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  // Recupere la preuve + l'user
+  const { data: proof, error: proofErr } = await supabase
+    .from('payment_proofs')
+    .select('id, applicant_id, status, method, profiles(telegram_id, name)')
+    .eq('id', proofId)
+    .maybeSingle();
+  if (proofErr || !proof) {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: 'Preuve introuvable', show_alert: true });
+    return;
+  }
+  if (proof.status !== 'pending') {
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: `Deja traitee (${proof.status})`, show_alert: true });
+    return;
+  }
+
+  const targetTelegramId: number | undefined = (proof as any).profiles?.telegram_id;
+  const targetName: string = (proof as any).profiles?.name ?? 'utilisateur';
+
+  if (action === 'approve') {
+    // Marque la preuve comme approuvee + active Premium
+    await supabase.from('payment_proofs').update({
+      status: 'approved',
+      processed_at: new Date().toISOString(),
+      processed_by: fromId,
+    }).eq('id', proofId);
+
+    if (targetTelegramId) await activatePremium(targetTelegramId, 30);
+
+    // Notifie l'user
+    if (targetTelegramId) {
+      await sendMessage(targetTelegramId,
+        `✅ Ta preuve ${proof.method.toUpperCase()} a ete validee !\n\n` +
+        `Ton statut *Je Gjobe Premium* est actif pour 30 jours.`,
+        { parse_mode: 'Markdown' });
+    }
+
+    // Update le caption + supprime les boutons sur le message admin
+    await tg('editMessageCaption', {
+      chat_id: chatId,
+      message_id: messageId,
+      caption: (msg.caption ?? '') + `\n\n✅ *APPROUVEE* par admin ${fromId}`,
+      parse_mode: 'Markdown',
+    });
+    await tg('answerCallbackQuery', { callback_query_id: cb.id, text: `Premium active pour ${targetName} ✅` });
+    return;
+  }
+
+  // action === 'reject'
+  await supabase.from('payment_proofs').update({
+    status: 'rejected',
+    processed_at: new Date().toISOString(),
+    processed_by: fromId,
+    reject_reason: 'Refuse par admin via Telegram',
+  }).eq('id', proofId);
+
+  if (targetTelegramId) {
+    await sendMessage(targetTelegramId,
+      `❌ Ta preuve de paiement ${proof.method.toUpperCase()} n'a pas pu etre validee.\n\n` +
+      `Verifie le montant (2 000 XOF), le destinataire et la date, puis renvoie une nouvelle preuve depuis l'app.`);
+  }
+
+  await tg('editMessageCaption', {
+    chat_id: chatId,
+    message_id: messageId,
+    caption: (msg.caption ?? '') + `\n\n❌ *REFUSEE* par admin ${fromId}`,
+    parse_mode: 'Markdown',
+  });
+  await tg('answerCallbackQuery', { callback_query_id: cb.id, text: `Preuve de ${targetName} refusee` });
+}
+
+// ===========================================================================
 // HTTP entry point
 // ===========================================================================
 Deno.serve(async (req) => {
@@ -313,6 +414,8 @@ Deno.serve(async (req) => {
   try {
     if (update.pre_checkout_query) {
       await handlePreCheckout(update.pre_checkout_query);
+    } else if (update.callback_query) {
+      await handleCallbackQuery(update.callback_query);
     } else {
       await handleUpdate(update);
     }

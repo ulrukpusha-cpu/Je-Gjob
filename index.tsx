@@ -5,7 +5,7 @@ import { useProfile } from './src/hooks/useProfile';
 import { useJobs } from './src/hooks/useJobs';
 import { useApplications } from './src/hooks/useApplications';
 import { supabase } from './src/lib/supabase';
-import { uploadAvatar, uploadJobPhotos } from './src/lib/storage';
+import { uploadAvatar, uploadJobPhotos, uploadPaymentProof } from './src/lib/storage';
 import { 
   MapPin, 
   Search, 
@@ -584,6 +584,45 @@ const App = () => {
   const PaymentModal = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [proofMethod, setProofMethod] = useState<'wave' | 'djamo' | null>(null);
+    const [proofSubmitting, setProofSubmitting] = useState(false);
+
+    const handleSubmitProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      e.target.value = '';
+      if (!file || !proofMethod) return;
+      if (!userId) {
+        alert('Connectez-vous via Telegram pour envoyer une preuve.');
+        return;
+      }
+      setProofSubmitting(true);
+      try {
+        const path = await uploadPaymentProof(file, userId);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('Session expiree');
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/submit-payment-proof`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ method: proofMethod, storage_path: path }),
+          },
+        );
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error ?? 'Erreur envoi');
+        alert('Preuve envoyee a l\'admin. Tu seras notifie en Telegram apres validation (sous 24h).');
+        setProofMethod(null);
+        setShowPaymentModal(false);
+      } catch (err: any) {
+        alert(err?.message ?? 'Echec de l\'envoi de la preuve.');
+      } finally {
+        setProofSubmitting(false);
+      }
+    };
 
     const handleTelegramPayment = async () => {
       setError('');
@@ -712,13 +751,55 @@ const App = () => {
                     <span>Wave (QR code)</span>
                  </button>
 
+                 {/* Bouton "Envoyer ma preuve" - upload capture + notif admin */}
+                 <div className="border-t border-dashed border-gray-200 dark:border-gray-700 pt-3 mt-1">
+                   <p className="text-[11px] text-center text-gray-500 dark:text-gray-400 mb-2">
+                     Apres paiement Wave/Djamo, envoie ta capture :
+                   </p>
+                   <label className={`block w-full py-2.5 px-3 rounded-xl font-semibold text-sm text-center cursor-pointer transition-all border-2 border-dashed ${
+                     proofSubmitting
+                       ? 'border-gray-300 bg-gray-50 dark:bg-gray-700 text-gray-400 cursor-wait'
+                       : 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/20'
+                   }`}>
+                     <div className="flex items-center justify-center gap-2">
+                       {proofSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                       <span>{proofSubmitting ? 'Envoi en cours…' : '📸 Envoyer ma preuve de paiement'}</span>
+                     </div>
+                     {!proofSubmitting && (
+                       <div className="flex gap-2 mt-2 justify-center">
+                         <button
+                           type="button"
+                           onClick={(ev) => { ev.preventDefault(); setProofMethod('wave'); ev.currentTarget.parentElement?.parentElement?.querySelector('input')?.click(); }}
+                           className="px-3 py-1 rounded-md bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 text-xs"
+                         >
+                           Wave
+                         </button>
+                         <button
+                           type="button"
+                           onClick={(ev) => { ev.preventDefault(); setProofMethod('djamo'); ev.currentTarget.parentElement?.parentElement?.querySelector('input')?.click(); }}
+                           className="px-3 py-1 rounded-md bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 text-xs"
+                         >
+                           Djamo
+                         </button>
+                       </div>
+                     )}
+                     <input
+                       type="file"
+                       accept="image/png,image/jpeg,image/webp"
+                       className="hidden"
+                       disabled={proofSubmitting}
+                       onChange={handleSubmitProof}
+                     />
+                   </label>
+                 </div>
+
                  <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
                    ⭐ <b>Telegram Stars</b> : activation auto.<br/>
-                   📱 <b>Djamo / Wave</b> : envoyer la capture du recu a{' '}
+                   📱 <b>Djamo / Wave</b> : capture envoyee a{' '}
                    <a href={ADMIN_CONTACT} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">
-                     notre admin Telegram
+                     l'admin
                    </a>{' '}
-                   - activation manuelle sous 24h.
+                   - activation sous 24h.
                  </p>
               </div>
            </div>
