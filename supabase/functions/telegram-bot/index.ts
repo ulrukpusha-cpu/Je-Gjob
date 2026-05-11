@@ -286,44 +286,41 @@ async function handlePreCheckout(query: any): Promise<void> {
 // HTTP entry point
 // ===========================================================================
 Deno.serve(async (req) => {
+  console.log('[telegram-bot] request received', req.method, req.url);
+
   if (req.method !== 'POST') return new Response('method not allowed', { status: 405 });
 
-  // Securité : Telegram envoie le secret dans ce header si setWebhook(secret_token=...)
   if (WEBHOOK_SECRET) {
     const got = req.headers.get('X-Telegram-Bot-Api-Secret-Token');
-    if (got !== WEBHOOK_SECRET) return new Response('forbidden', { status: 403 });
+    if (got !== WEBHOOK_SECRET) {
+      console.warn('[telegram-bot] secret mismatch');
+      return new Response('forbidden', { status: 403 });
+    }
   }
 
-  if (!TELEGRAM_BOT_TOKEN) return new Response('TELEGRAM_BOT_TOKEN missing', { status: 500 });
+  if (!TELEGRAM_BOT_TOKEN) {
+    console.error('[telegram-bot] TELEGRAM_BOT_TOKEN missing');
+    return new Response('TELEGRAM_BOT_TOKEN missing', { status: 500 });
+  }
 
   let update: any;
   try {
     update = await req.json();
-  } catch {
+  } catch (e) {
+    console.error('[telegram-bot] bad json', e);
     return new Response('bad json', { status: 400 });
   }
 
-  // On repond 200 immediatement pour eviter les retries Telegram,
-  // tout en lancant le handler en arriere-plan (EdgeRuntime.waitUntil sur Supabase).
-  const work = (async () => {
-    try {
-      if (update.pre_checkout_query) {
-        await handlePreCheckout(update.pre_checkout_query);
-        return;
-      }
-      await handleUpdate(update);
-    } catch (err) {
-      console.error('handler error', err);
-    }
-  })();
+  console.log('[telegram-bot] update', JSON.stringify(update).slice(0, 500));
 
-  // EdgeRuntime existe sur Supabase Edge Functions; sinon on attend simplement.
-  // @ts-ignore
-  if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
-    // @ts-ignore
-    EdgeRuntime.waitUntil(work);
-  } else {
-    await work;
+  try {
+    if (update.pre_checkout_query) {
+      await handlePreCheckout(update.pre_checkout_query);
+    } else {
+      await handleUpdate(update);
+    }
+  } catch (err) {
+    console.error('[telegram-bot] handler error', err);
   }
 
   return new Response('ok');
