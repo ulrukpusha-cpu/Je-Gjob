@@ -585,7 +585,7 @@ const App = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
 
-    const handleTelegramPayment = () => {
+    const handleTelegramPayment = async () => {
       setError('');
       const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
       if (!tg) {
@@ -594,12 +594,35 @@ const App = () => {
       }
       try {
         setIsLoading(true);
-        tg.sendData(JSON.stringify({ action: 'premium_subscribe' }));
-        // sendData ferme la WebApp et envoie au bot, qui ouvre l'invoice Stars
-        setShowPaymentModal(false);
-      } catch (e) {
-        console.error('Telegram payment error', e);
-        setError("Le paiement Telegram a échoué ou a été annulé.");
+        // 1. Demande au backend un lien d'invoice (la WebApp reste ouverte)
+        const res = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-stars-invoice`,
+          {
+            method: 'POST',
+            headers: {
+              'content-type': 'application/json',
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: '{}',
+          },
+        );
+        const data = await res.json();
+        if (!data.url) throw new Error(data.error ?? 'Pas de lien invoice');
+
+        // 2. Ouvre l'invoice par-dessus la WebApp (overlay natif Telegram)
+        tg.openInvoice(data.url, (status: string) => {
+          if (status === 'paid') {
+            setShowPaymentModal(false);
+            // Le bot a deja active is_premium, le Realtime push fera le reste
+          } else if (status === 'cancelled') {
+            setError('Paiement annule.');
+          } else if (status === 'failed') {
+            setError('Le paiement a echoue.');
+          }
+        });
+      } catch (e: any) {
+        console.error('Telegram Stars error', e);
+        setError(e?.message ?? "Impossible d'ouvrir le paiement Telegram.");
       } finally {
         setIsLoading(false);
       }
@@ -1787,9 +1810,17 @@ const App = () => {
     return (
       <div className="max-w-3xl mx-auto px-4 py-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-300">
          <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-gray-700 text-center">
-            <div className="w-28 h-28 rounded-full bg-orange-100 dark:bg-orange-900/20 mx-auto mb-4 flex items-center justify-center text-orange-500 dark:text-orange-400 text-3xl font-bold border-4 border-white dark:border-gray-700 shadow-lg">
-               {selectedPublicProfile.name.charAt(0)}
-            </div>
+            {selectedPublicProfile.profilePicture ? (
+              <img
+                src={selectedPublicProfile.profilePicture}
+                alt={selectedPublicProfile.name}
+                className="w-28 h-28 rounded-full object-cover mx-auto mb-4 border-4 border-white dark:border-gray-700 shadow-lg"
+              />
+            ) : (
+              <div className="w-28 h-28 rounded-full bg-orange-100 dark:bg-orange-900/20 mx-auto mb-4 flex items-center justify-center text-orange-500 dark:text-orange-400 text-3xl font-bold border-4 border-white dark:border-gray-700 shadow-lg">
+                 {selectedPublicProfile.name.charAt(0)}
+              </div>
+            )}
             
             <div className="flex justify-center items-center gap-2 mb-1">
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{selectedPublicProfile.name}</h2>
