@@ -1592,12 +1592,24 @@ const App = () => {
         </div>
 
         {!profile.isPremium && (
-          <button 
+          <button
              onClick={() => setShowPaymentModal(true)}
-             className="mt-6 w-full py-3 bg-gradient-to-r from-gray-900 to-gray-800 dark:from-white dark:to-gray-100 text-white dark:text-gray-900 rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2"
+             className="group relative mt-6 w-full py-4 px-5 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-500 bg-[length:200%_auto] hover:bg-[position:right_center] text-white rounded-2xl font-bold shadow-lg shadow-amber-500/30 hover:shadow-xl hover:shadow-amber-500/50 hover:scale-[1.02] active:scale-[0.99] transition-all duration-500 overflow-hidden"
           >
-             <Crown size={18} className="text-amber-400 dark:text-amber-500 fill-amber-400 dark:fill-amber-500" />
-             Passer Premium ({currency.premiumLabel})
+             {/* Badge en coin */}
+             <span className="absolute top-1.5 right-2 text-[9px] font-extrabold tracking-wider bg-white/20 backdrop-blur-sm px-1.5 py-0.5 rounded-full">
+               ⚡ INSTANT
+             </span>
+             {/* Effet shine au hover */}
+             <span className="pointer-events-none absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/20 to-transparent skew-x-12" />
+
+             <div className="relative flex items-center justify-center gap-2.5">
+               <Crown size={22} className="fill-white drop-shadow-md" />
+               <div className="text-left leading-tight">
+                 <div className="text-base font-extrabold">Passer Premium</div>
+                 <div className="text-[11px] font-medium opacity-90">{currency.premiumLabel} - 1 clic via Telegram Stars</div>
+               </div>
+             </div>
           </button>
         )}
       </div>
