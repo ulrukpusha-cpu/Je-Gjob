@@ -20,6 +20,7 @@ export default defineConfig(({ mode }) => {
         'process.env.TELEGRAM_PREMIUM_INVOICE_SLUG': JSON.stringify(env.TELEGRAM_PREMIUM_INVOICE_SLUG),
         'process.env.DJAMO_PAYMENT_URL': JSON.stringify(env.DJAMO_PAYMENT_URL),
         'process.env.WAVE_QR_URL': JSON.stringify(env.WAVE_QR_URL),
+        'process.env.ADMIN_CONTACT': JSON.stringify(env.ADMIN_CONTACT),
         'process.env.ADMIN_SECRET': JSON.stringify(env.ADMIN_SECRET)
       },
       resolve: {

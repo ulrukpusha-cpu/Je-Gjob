@@ -33,7 +33,7 @@ const KIMI_MODEL    = Deno.env.get('KIMI_MODEL')
 const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
 const ANTHROPIC_MODEL   = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
 
-const PAYMENT_PROVIDER_TOKEN = Deno.env.get('TELEGRAM_PAYMENT_PROVIDER_TOKEN');
+// (TELEGRAM_PAYMENT_PROVIDER_TOKEN n'est plus utilise : Stars = paiement natif sans provider)
 
 // ===========================================================================
 // Telegram Bot API helpers
@@ -238,18 +238,15 @@ async function handleUpdate(update: any): Promise<void> {
     try {
       const data = JSON.parse(msg.web_app_data.data);
       if (data.action === 'premium_subscribe') {
-        if (!PAYMENT_PROVIDER_TOKEN) {
-          await sendMessage(chatId, "Le paiement Telegram n'est pas encore configuré côté serveur.");
-          return;
-        }
+        // Telegram Stars (XTR) : pas besoin de provider_token, integration native.
+        // 300 Stars ~ 4 USD ~ 2400 XOF. Telegram prend ~30% de commission.
         await tg('sendInvoice', {
           chat_id: chatId,
           title: 'Je Gjobe Premium',
-          description: 'Abonnement mensuel Je Gjobe Premium (2 000 XOF).',
+          description: 'Abonnement mensuel Je Gjobe Premium - acces visibilite premium pendant 30 jours.',
           payload: 'premium-pass',
-          provider_token: PAYMENT_PROVIDER_TOKEN,
-          currency: 'XOF',
-          prices: [{ label: 'Je Gjobe Premium - 1 mois', amount: 200000 }],
+          currency: 'XTR',
+          prices: [{ label: 'Je Gjobe Premium - 1 mois', amount: 300 }],
         });
         return;
       }

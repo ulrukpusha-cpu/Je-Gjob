@@ -108,8 +108,11 @@ const KIMI_BASE_URL = (process.env.KIMI_BASE_URL || 'https://api.moonshot.ai/v1'
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-20250514';
 const TELEGRAM_PREMIUM_INVOICE_SLUG = process.env.TELEGRAM_PREMIUM_INVOICE_SLUG;
-const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL;
-const WAVE_QR_URL = process.env.WAVE_QR_URL || '/wave-qr.png';
+// Liens Mobile Money (Cote d'Ivoire). Override possible via env var.
+const DJAMO_PAYMENT_URL = process.env.DJAMO_PAYMENT_URL || 'https://pay.djamo.com/pkbyg';
+const WAVE_QR_URL       = process.env.WAVE_QR_URL       || 'https://pay.wave.com/m/M_ci_KslOdTnbqD3G/c/ci/';
+// Compte admin Telegram contactable apres paiement Wave/Djamo (active manuellement le Premium)
+const ADMIN_CONTACT     = process.env.ADMIN_CONTACT     || 'https://t.me/jegjobe_admin';
 const ADMIN_SECRET = process.env.ADMIN_SECRET || 'jegjobe-admin';
 
 // Devises selon le pays (code ISO)
@@ -586,17 +589,13 @@ const App = () => {
       setError('');
       const tg = typeof window !== 'undefined' ? (window as any).Telegram?.WebApp : null;
       if (!tg) {
-        alert("Ouvrez Je Gjobe depuis Telegram pour payer via Telegram.");
-        return;
-      }
-      if (!TELEGRAM_PREMIUM_INVOICE_SLUG) {
-        alert("Le paiement Telegram n'est pas encore configuré côté bot.");
+        alert("Ouvrez Je Gjobe depuis Telegram pour payer via Telegram Stars.");
         return;
       }
       try {
         setIsLoading(true);
         tg.sendData(JSON.stringify({ action: 'premium_subscribe' }));
-        alert("Demande d'abonnement envoyée au bot Telegram. Complétez le paiement dans la conversation. Votre statut Premium sera activé après confirmation.");
+        // sendData ferme la WebApp et envoie au bot, qui ouvre l'invoice Stars
         setShowPaymentModal(false);
       } catch (e) {
         console.error('Telegram payment error', e);
@@ -608,12 +607,23 @@ const App = () => {
 
     const handleDjamoPayment = () => {
       setError('');
-      if (!DJAMO_PAYMENT_URL) {
-        alert("Le paiement Djamo n'est pas encore configuré.");
-        return;
-      }
       window.open(DJAMO_PAYMENT_URL, '_blank');
-      alert("Complétez le paiement dans la fenêtre ouverte. Votre statut Premium sera activé après confirmation côté serveur.");
+      alert(
+        "1. Complete le paiement de 2 000 XOF dans la fenetre Djamo.\n" +
+        "2. Envoie une capture du recu a notre admin Telegram pour activation Premium.\n\n" +
+        "Activation manuelle sous 24h."
+      );
+      setShowPaymentModal(false);
+    };
+
+    const handleWavePayment = () => {
+      setError('');
+      window.open(WAVE_QR_URL, '_blank');
+      alert(
+        "1. Complete le paiement de 2 000 XOF via Wave.\n" +
+        "2. Envoie une capture du recu a notre admin Telegram pour activation Premium.\n\n" +
+        "Activation manuelle sous 24h."
+      );
       setShowPaymentModal(false);
     };
 
@@ -651,48 +661,41 @@ const App = () => {
               <div className="space-y-4">
                  {error && <p className="text-red-500 text-sm">{error}</p>}
 
-                 <button 
+                 <button
                     type="button"
                     disabled={isLoading}
                     onClick={handleTelegramPayment}
                     className="w-full bg-sky-500 hover:bg-sky-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2 mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
                  >
-                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : "Payer via Telegram"}
+                    {isLoading ? <Loader2 className="animate-spin" size={20} /> : <>⭐ Payer 300 Stars (auto)</>}
                  </button>
-                 
-                 <button 
+                 <p className="text-[11px] text-center text-gray-500 dark:text-gray-400 -mt-2">Activation Premium instantanee.</p>
+
+                 <button
                     type="button"
                     onClick={handleDjamoPayment}
                     className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
                  >
                     <CreditCard size={20} />
-                    <span>Payer avec Djamo (Mobile Money XOF)</span>
+                    <span>Djamo Mobile Money (XOF)</span>
                  </button>
 
-                 {WAVE_QR_URL ? (
-                   <a
-                     href={WAVE_QR_URL}
-                     target="_blank"
-                     rel="noopener noreferrer"
-                     onClick={() => setShowPaymentModal(false)}
-                     className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
-                   >
-                     <Euro size={20} />
-                     <span>Voir le QR code Wave</span>
-                   </a>
-                 ) : (
-                   <button
-                     type="button"
-                     onClick={() => alert("Le QR code Wave n'est pas encore configuré.")}
-                     className="w-full bg-gray-300 dark:bg-gray-600 text-gray-500 py-3 rounded-xl font-bold cursor-not-allowed flex items-center justify-center gap-2"
-                   >
-                     <Euro size={20} />
-                     <span>Wave (non configuré)</span>
-                   </button>
-                 )}
+                 <button
+                    type="button"
+                    onClick={handleWavePayment}
+                    className="w-full bg-indigo-500 hover:bg-indigo-600 text-white py-3 rounded-xl font-bold transition-colors flex items-center justify-center gap-2"
+                 >
+                    <Euro size={20} />
+                    <span>Wave (QR code)</span>
+                 </button>
 
-                 <p className="text-xs text-center text-gray-400 dark:text-gray-500 mt-4">
-                   Le paiement est traité via Telegram, Djamo ou Wave. Votre statut Premium sera mis à jour après confirmation côté serveur.
+                 <p className="text-xs text-center text-gray-500 dark:text-gray-400 mt-2">
+                   ⭐ <b>Telegram Stars</b> : activation auto.<br/>
+                   📱 <b>Djamo / Wave</b> : envoyer la capture du recu a{' '}
+                   <a href={ADMIN_CONTACT} target="_blank" rel="noopener noreferrer" className="text-orange-500 hover:underline">
+                     notre admin Telegram
+                   </a>{' '}
+                   - activation manuelle sous 24h.
                  </p>
               </div>
            </div>
