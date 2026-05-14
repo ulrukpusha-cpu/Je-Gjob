@@ -154,7 +154,7 @@ async function callKimi(text: string): Promise<string | null> {
     if (!res.ok) {
       const txt = await res.text().catch(() => '');
       console.error('Kimi error', res.status, txt);
-      lastAiError = `Kimi HTTP ${res.status} - ${txt.slice(0, 120)}`;
+      lastAiError = `Kimi HTTP ${res.status} | url=${KIMI_BASE_URL}/chat/completions | model='${KIMI_MODEL}' | nvidia=${IS_NVIDIA} | body=${txt.slice(0, 80)}`;
       return null;
     }
     const data = await res.json();
