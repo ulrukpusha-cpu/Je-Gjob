@@ -22,16 +22,20 @@ const WEBHOOK_SECRET     = Deno.env.get('TELEGRAM_WEBHOOK_SECRET');
 const SUPABASE_URL       = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-const KIMI_API_KEY  = Deno.env.get('KIMI_API_KEY');
+// .trim() partout pour neutraliser les espaces / retours de ligne invisibles
+// que les UI de secrets ajoutent parfois lors du copier-coller.
+const env = (k: string) => Deno.env.get(k)?.trim() || undefined;
+
+const KIMI_API_KEY  = env('KIMI_API_KEY');
 // Auto-detect NVIDIA NIM (cle "nvapi-...") sinon Moonshot par defaut
 const IS_NVIDIA = !!KIMI_API_KEY && KIMI_API_KEY.startsWith('nvapi-');
-const KIMI_BASE_URL = (Deno.env.get('KIMI_BASE_URL')
+const KIMI_BASE_URL = (env('KIMI_BASE_URL')
   ?? (IS_NVIDIA ? 'https://integrate.api.nvidia.com/v1' : 'https://api.moonshot.ai/v1')).replace(/\/$/, '');
-const KIMI_MODEL    = Deno.env.get('KIMI_MODEL')
-  ?? (IS_NVIDIA ? 'moonshotai/kimi-k2-instruct' : 'kimi-k2-turbo-preview');
+const KIMI_MODEL = env('KIMI_MODEL')
+  ?? (IS_NVIDIA ? 'moonshotai/kimi-k2.6' : 'kimi-k2-turbo-preview');
 
-const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-const ANTHROPIC_MODEL   = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
+const ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY');
+const ANTHROPIC_MODEL   = env('ANTHROPIC_MODEL') ?? 'claude-sonnet-4-20250514';
 
 // (TELEGRAM_PAYMENT_PROVIDER_TOKEN n'est plus utilise : Stars = paiement natif sans provider)
 const ADMIN_IDS = (Deno.env.get('ADMIN_TELEGRAM_IDS') ?? '')
