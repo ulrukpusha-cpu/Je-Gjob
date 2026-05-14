@@ -104,8 +104,14 @@ const SYSTEM_PROMPT =
   "Tu aides les utilisateurs à trouver ou proposer des missions, améliorer leur profil, " +
   "rédiger de bonnes annonces. Réponds en français clair, court, concret.";
 
+// Stocke la derniere erreur pour la remonter a l'user (debug)
+let lastAiError: string | null = null;
+
 async function callKimi(text: string): Promise<string | null> {
-  if (!KIMI_API_KEY) return null;
+  if (!KIMI_API_KEY) {
+    lastAiError = 'KIMI_API_KEY missing';
+    return null;
+  }
   try {
     let res = await fetch(`${KIMI_BASE_URL}/chat/completions`, {
       method: 'POST',
@@ -146,12 +152,17 @@ async function callKimi(text: string): Promise<string | null> {
     }
 
     if (!res.ok) {
-      console.error('Kimi error', res.status, await res.text().catch(() => ''));
+      const txt = await res.text().catch(() => '');
+      console.error('Kimi error', res.status, txt);
+      lastAiError = `Kimi HTTP ${res.status} - ${txt.slice(0, 120)}`;
       return null;
     }
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content?.trim() || null;
+    const out = data?.choices?.[0]?.message?.content?.trim();
+    if (!out) lastAiError = 'Kimi reponse vide';
+    return out || null;
   } catch (e) {
+    lastAiError = `Kimi exception: ${(e as Error).message}`;
     console.error('Kimi exception', e);
     return null;
   }
@@ -175,27 +186,33 @@ async function callAnthropic(text: string): Promise<string | null> {
       }),
     });
     if (!res.ok) {
-      console.error('Anthropic error', res.status, await res.text().catch(() => ''));
+      const txt = await res.text().catch(() => '');
+      console.error('Anthropic error', res.status, txt);
+      lastAiError = `Anthropic HTTP ${res.status} - ${txt.slice(0, 120)}`;
       return null;
     }
     const data = await res.json();
     const block = data?.content?.find?.((b: { type: string }) => b.type === 'text');
-    return ((block as { text?: string })?.text ?? '').trim() || null;
+    const out = ((block as { text?: string })?.text ?? '').trim();
+    if (!out) lastAiError = 'Anthropic reponse vide';
+    return out || null;
   } catch (e) {
+    lastAiError = `Anthropic exception: ${(e as Error).message}`;
     console.error('Anthropic exception', e);
     return null;
   }
 }
 
 async function callAi(text: string): Promise<string> {
+  lastAiError = null;
   const kimi = await callKimi(text);
   if (kimi) return kimi;
   const anthropic = await callAnthropic(text);
   if (anthropic) return anthropic;
   if (!KIMI_API_KEY && !ANTHROPIC_API_KEY) {
-    return "Le chatbot IA n'est pas configuré (KIMI_API_KEY ou ANTHROPIC_API_KEY manquant côté serveur).";
+    return "⚠️ Chatbot IA non configuré : ajoute KIMI_API_KEY ou ANTHROPIC_API_KEY dans Supabase > Edge Functions > Secrets.";
   }
-  return "😕 L'IA n'arrive pas à répondre pour l'instant. Réessaie dans un instant.";
+  return `😕 L'IA n'arrive pas à répondre.\n\n_Détail : ${lastAiError ?? 'erreur inconnue'}_`;
 }
 
 // ===========================================================================
@@ -259,16 +276,22 @@ async function handleUpdate(update: any): Promise<void> {
     }
   }
 
-  // 3. Commandes
-  switch (text.split(' ')[0]) {
-    case '/start':           return void await sendMessage(chatId, WELCOME,       { parse_mode: 'Markdown' });
-    case '/help':            return void await sendMessage(chatId, HELP,          { parse_mode: 'Markdown' });
-    case '/exemple_annonce': return void await sendMessage(chatId, SAMPLE_AD,     { parse_mode: 'Markdown' });
-    case '/conseils_profil': return void await sendMessage(chatId, PROFILE_TIPS,  { parse_mode: 'Markdown' });
+  // 3. Commandes (insensibles a la casse + accepte avec ou sans underscore)
+  const cmd = text.split(' ')[0].toLowerCase().replace(/_/g, '');
+  switch (cmd) {
+    case '/start':                                          return void await sendMessage(chatId, WELCOME,       { parse_mode: 'Markdown' });
+    case '/help':                                           return void await sendMessage(chatId, HELP,          { parse_mode: 'Markdown' });
+    case '/exempleannonce':                                 return void await sendMessage(chatId, SAMPLE_AD,     { parse_mode: 'Markdown' });
+    case '/conseilsprofil':                                 return void await sendMessage(chatId, PROFILE_TIPS,  { parse_mode: 'Markdown' });
   }
 
-  // 4. Texte libre -> IA
-  if (!text || text.startsWith('/')) return;
+  // 4. Texte libre -> IA (ignore les autres commandes inconnues)
+  if (!text || text.startsWith('/')) {
+    if (text.startsWith('/')) {
+      await sendMessage(chatId, "Commande inconnue. Tape /help pour voir la liste.");
+    }
+    return;
+  }
   await sendTyping(chatId);
   const answer = await callAi(text);
   await sendMessage(chatId, answer);
