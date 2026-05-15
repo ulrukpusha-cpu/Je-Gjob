@@ -37,6 +37,7 @@ import {
   BellRing,
   ArrowLeft,
   PlusCircle,
+  Plus,
   MoreVertical,
   Truck,
   Palette,
@@ -962,55 +963,76 @@ const App = () => {
   // Bande verte design (separateur visuel entre sections de la home)
   const GreenBar = () => <div className="h-[3px] w-full bg-emerald-500/80" />;
 
-  const BottomNav = () => (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-gray-800/95 backdrop-blur-md border-t border-gray-200/80 dark:border-gray-700/80 pb-[env(safe-area-inset-bottom)] transition-colors md:max-w-lg md:left-1/2 md:-translate-x-1/2">
-      <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-around">
-        <button
-          onClick={toggleTheme}
-          className="p-3 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          aria-label="Thème"
+  const BottomNav = () => {
+    const activeTab = 'home';
+
+    const navItemClass = (isActive: boolean) =>
+      `flex flex-col items-center justify-center gap-0.5 min-w-[4.25rem] py-2 px-3 rounded-full transition-all duration-200 ${
+        isActive
+          ? 'bg-gray-100 text-[#007AFF] dark:bg-[#333333] dark:text-[#007AFF]'
+          : 'text-gray-600 hover:text-gray-900 dark:text-white/90 dark:hover:text-white'
+      }`;
+
+    return (
+      <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] md:left-1/2 md:-translate-x-1/2 md:max-w-lg pointer-events-none">
+        <nav
+          className="pointer-events-auto flex flex-1 items-center justify-around min-h-[58px] max-w-[calc(100%-3.75rem)] rounded-full bg-white/90 backdrop-blur-xl border border-gray-200/70 shadow-lg shadow-black/5 dark:bg-[rgba(34,34,34,0.82)] dark:border-white/[0.08] dark:shadow-black/25 px-1 py-1"
+          aria-label="Navigation principale"
         >
-          {theme === 'light' ? <Sun size={24} /> : <Moon size={24} />}
-        </button>
+          <button
+            onClick={() => handleNavigate('home')}
+            className={navItemClass(activeTab === 'home')}
+            aria-label="Missions"
+            aria-current={activeTab === 'home' ? 'page' : undefined}
+          >
+            <Briefcase size={22} strokeWidth={activeTab === 'home' ? 2.25 : 2} className={activeTab === 'home' ? 'text-[#007AFF]' : undefined} />
+            <span className={`text-[10px] font-medium leading-none ${activeTab === 'home' ? 'text-[#007AFF]' : ''}`}>Missions</span>
+          </button>
+          <button
+            onClick={() => handleNavigate('profile')}
+            className={navItemClass(false)}
+            aria-label="Candidatures"
+          >
+            <span className="relative">
+              <Check size={22} strokeWidth={2} />
+              {appliedJobs.size > 0 && (
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center bg-[#007AFF] text-white text-[10px] font-bold rounded-full px-1">
+                  {appliedJobs.size}
+                </span>
+              )}
+            </span>
+            <span className="text-[10px] font-medium leading-none">Candidatures</span>
+          </button>
+
+          <button
+            onClick={() => handleNavigate('profile')}
+            className={navItemClass(false)}
+            aria-label="Profil"
+          >
+            <span className="relative">
+              {profile.isCreated && profile.profilePicture ? (
+                <img src={profile.profilePicture} alt="" className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/20" />
+              ) : (
+                <User size={22} strokeWidth={2} />
+              )}
+              {profile.isPremium && (
+                <Crown size={11} className="text-amber-500 absolute -top-1 -right-1.5 fill-amber-500" />
+              )}
+            </span>
+            <span className="text-[10px] font-medium leading-none">Profil</span>
+          </button>
+        </nav>
+
         <button
           onClick={() => handleNavigate('create_job')}
-          className="flex items-center justify-center w-14 h-14 -mt-6 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/30 hover:shadow-orange-500/40 transition-all hover:scale-105"
+          className="pointer-events-auto flex shrink-0 items-center justify-center w-14 h-14 rounded-full bg-white/90 backdrop-blur-xl border border-gray-200/70 text-gray-800 shadow-lg shadow-black/5 hover:scale-105 active:scale-95 transition-all dark:bg-[rgba(34,34,34,0.82)] dark:border-white/[0.08] dark:text-white dark:shadow-black/25"
           aria-label="Publier une annonce"
         >
-          <PlusCircle size={28} strokeWidth={2.5} />
-        </button>
-        <button
-          onClick={() => handleNavigate('profile')}
-          className="flex flex-col items-center gap-0.5 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-600 dark:text-gray-300"
-        >
-          <span className="relative">
-            <Check size={24} />
-            {appliedJobs.size > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center bg-orange-500 text-white text-xs font-bold rounded-full px-1">
-                {appliedJobs.size}
-              </span>
-            )}
-          </span>
-          <span className="text-[10px] font-medium">Candidatures</span>
-        </button>
-        <button
-          onClick={() => handleNavigate('profile')}
-          className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 relative transition-colors"
-        >
-          {profile.isCreated && profile.profilePicture ? (
-            <img src={profile.profilePicture} alt="Profil" className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600" />
-          ) : (
-            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-600 flex items-center justify-center text-gray-600 dark:text-gray-300">
-              <User size={22} />
-            </div>
-          )}
-          {profile.isPremium && (
-            <Crown size={14} className="text-amber-500 absolute -top-0.5 -right-0.5 fill-amber-500 bg-white dark:bg-gray-800 rounded-full" />
-          )}
+          <Plus size={26} strokeWidth={2.5} />
         </button>
       </div>
-    </div>
-  );
+    );
+  };
 
   const CreateJobView = () => {
     const isEdit = !!editingJob;
