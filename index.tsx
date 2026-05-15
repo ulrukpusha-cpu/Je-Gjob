@@ -721,7 +721,7 @@ const App = () => {
 
     return (
       <div className="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-0 max-w-md w-full overflow-hidden border border-gray-100 dark:border-gray-700">
+        <div className="bg-poussin-100 dark:bg-gray-800 rounded-2xl shadow-2xl p-0 max-w-md w-full overflow-hidden border border-gray-100 dark:border-gray-700">
            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white relative">
               <button 
                  onClick={() => setShowPaymentModal(false)}
@@ -786,7 +786,7 @@ const App = () => {
                    </p>
                    <label className={`block w-full py-2.5 px-3 rounded-xl font-semibold text-sm text-center cursor-pointer transition-all border-2 border-dashed ${
                      proofSubmitting
-                       ? 'border-gray-300 bg-gray-50 dark:bg-gray-700 text-gray-400 cursor-wait'
+                       ? 'border-gray-300 bg-poussin-50 dark:bg-gray-700 text-gray-400 cursor-wait'
                        : 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/10 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/20'
                    }`}>
                      <div className="flex items-center justify-center gap-2">
@@ -841,7 +841,7 @@ const App = () => {
 
     return (
       <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setConfirmingJobId(null)}>
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full transform transition-all scale-100 border dark:border-gray-700" onClick={e => e.stopPropagation()}>
+        <div className="bg-poussin-100 dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full transform transition-all scale-100 border dark:border-gray-700" onClick={e => e.stopPropagation()}>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Confirmer la candidature</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">Êtes-vous sûr de vouloir postuler à cette offre ?</p>
           <div className="flex gap-3">
@@ -868,7 +868,7 @@ const App = () => {
 
     return (
       <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" onClick={() => setCancelingJobId(null)}>
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full transform transition-all scale-100 border dark:border-gray-700" onClick={e => e.stopPropagation()}>
+        <div className="bg-poussin-100 dark:bg-gray-800 rounded-2xl shadow-2xl p-6 max-w-sm w-full transform transition-all scale-100 border dark:border-gray-700" onClick={e => e.stopPropagation()}>
           <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Annuler la candidature</h3>
           <p className="text-gray-500 dark:text-gray-400 mb-6">Êtes-vous sûr de vouloir annuler votre candidature à cette offre ?</p>
           <div className="flex gap-3">
@@ -892,7 +892,7 @@ const App = () => {
 
   const Navbar = () => {
     return (
-      <nav className="bg-white dark:bg-gray-800/95 backdrop-blur-md shadow-sm fixed top-0 w-full z-50 border-b border-gray-200/80 dark:border-gray-700/80 transition-colors duration-300">
+      <nav className="bg-poussin-100/95 dark:bg-gray-800/95 backdrop-blur-md shadow-sm fixed top-0 w-full z-50 border-b border-poussin-200/80 dark:border-gray-700/80 transition-colors duration-300">
         <div className="max-w-4xl mx-auto px-4 py-2.5 flex justify-between items-center">
           <div className="w-10 flex justify-start">
             {viewHistory.length > 0 ? (
@@ -922,17 +922,17 @@ const App = () => {
             {showHeaderMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowHeaderMenu(false)} aria-hidden />
-                <div className="absolute right-0 top-full mt-1 py-2 w-52 bg-white dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50">
-                  <button onClick={() => { setShowHeaderMenu(false); toggleTheme(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <div className="absolute right-0 top-full mt-1 py-2 w-52 bg-poussin-100 dark:bg-gray-800 rounded-xl shadow-xl border border-gray-100 dark:border-gray-700 z-50">
+                  <button onClick={() => { setShowHeaderMenu(false); toggleTheme(); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-poussin-200 dark:hover:bg-gray-700">
                     {theme === 'light' ? <Moon size={18} /> : <Sun size={18} />}
                     {theme === 'light' ? 'Mode sombre' : 'Mode clair'}
                   </button>
-                  <button onClick={() => { setShowHeaderMenu(false); handleNavigate('about'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <button onClick={() => { setShowHeaderMenu(false); handleNavigate('about'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-poussin-200 dark:hover:bg-gray-700">
                     <Info size={18} />
                     À propos
                   </button>
                   {isAdmin && (
-                    <button onClick={() => { setShowHeaderMenu(false); handleNavigate('admin'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <button onClick={() => { setShowHeaderMenu(false); handleNavigate('admin'); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-left text-gray-700 dark:text-gray-200 hover:bg-poussin-200 dark:hover:bg-gray-700">
                       <ShieldCheck size={18} />
                       Admin
                     </button>
@@ -947,7 +947,7 @@ const App = () => {
   };
 
   const HomeLogoBlock = () => (
-    <div className="bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700/80 transition-colors">
+    <div className="bg-poussin-100 dark:bg-gray-800 border-b border-poussin-200 dark:border-gray-700/80 transition-colors">
       <div className="max-w-4xl mx-auto px-4 py-5 flex items-center gap-4">
         <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/20">
           <Briefcase size={28} />
@@ -973,7 +973,7 @@ const App = () => {
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] md:left-1/2 md:-translate-x-1/2 md:max-w-lg pointer-events-none">
         <nav
-          className="pointer-events-auto flex flex-1 items-center justify-around min-h-[58px] max-w-[calc(100%-3.75rem)] rounded-full bg-white/95 backdrop-blur-xl border border-gray-200/80 shadow-lg shadow-black/5 dark:bg-gray-900/95 dark:border-gray-700/60 dark:shadow-black/30 px-1 py-1"
+          className="pointer-events-auto flex flex-1 items-center justify-around min-h-[58px] max-w-[calc(100%-3.75rem)] rounded-full bg-poussin-100/95 backdrop-blur-xl border border-poussin-200/80 shadow-lg shadow-black/5 dark:bg-gray-900/95 dark:border-gray-700/60 dark:shadow-black/30 px-1 py-1"
           aria-label="Navigation principale"
         >
           <button
@@ -1119,7 +1119,7 @@ const App = () => {
                {isEdit ? "Modifier l'annonce" : 'Publier une annonce'}
             </h2>
 
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
+            <div className="bg-poussin-100 dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-5">
                 
                 {/* Title */}
                 <div>
@@ -1145,7 +1145,7 @@ const App = () => {
                                 className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-sm transition-all ${
                                     category === cat.id 
                                     ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-500 text-orange-600 dark:text-orange-400' 
-                                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                                    : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-poussin-200 dark:hover:bg-gray-700'
                                 }`}
                             >
                                 {cat.icon}
@@ -1285,7 +1285,7 @@ const App = () => {
                                 className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                                     availability === opt.id
                                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-800'
-                                    : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                    : 'bg-poussin-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-poussin-200 dark:border-gray-600 hover:bg-poussin-200 dark:hover:bg-gray-600'
                                 }`}
                             >
                                 {opt.label}
@@ -1317,7 +1317,7 @@ const App = () => {
   };
 
   const LocationHeader = () => (
-    <div className="bg-white dark:bg-gray-800 pt-4 pb-2 px-4 sticky top-[56px] z-40 shadow-sm transition-colors duration-300">
+    <div className="bg-poussin-100 dark:bg-gray-800 pt-4 pb-2 px-4 sticky top-[56px] z-40 shadow-sm transition-colors duration-300">
       <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Votre position</p>
       <div className="flex justify-between items-center max-w-4xl mx-auto">
         <div className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
@@ -1336,7 +1336,7 @@ const App = () => {
       </div>
 
       {showFilters && (
-        <div className="max-w-4xl mx-auto mt-4 p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 animate-in fade-in slide-in-from-top-2">
+        <div className="max-w-4xl mx-auto mt-4 p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700 animate-in fade-in slide-in-from-top-2">
            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                  <label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2 block">Prix maximum: {formatPrice(filterMaxPrice)}</label>
@@ -1367,7 +1367,7 @@ const App = () => {
                  <select 
                    value={filterAvailability}
                    onChange={(e) => setFilterAvailability(e.target.value)}
-                   className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-orange-500 dark:text-white"
+                   className="w-full p-2 bg-poussin-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-orange-500 dark:text-white"
                  >
                     {AVAILABILITY_OPTIONS.map(opt => (
                       <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -1379,7 +1379,7 @@ const App = () => {
                  <select 
                    value={filterDate}
                    onChange={(e) => setFilterDate(e.target.value)}
-                   className="w-full p-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-orange-500 dark:text-white"
+                   className="w-full p-2 bg-poussin-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg text-sm outline-none focus:border-orange-500 dark:text-white"
                  >
                     {DATE_OPTIONS.map(opt => (
                       <option key={opt.id} value={opt.id}>{opt.label}</option>
@@ -1393,7 +1393,7 @@ const App = () => {
   );
 
   const CategoryFilter = () => (
-    <div className="bg-white dark:bg-gray-800 border-b dark:border-gray-700 py-3 sticky top-[120px] z-30 transition-colors duration-300">
+    <div className="bg-poussin-100 dark:bg-gray-800 border-b dark:border-gray-700 py-3 sticky top-[120px] z-30 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 overflow-x-auto no-scrollbar">
         <div className="flex gap-3 pb-1">
           {CATEGORIES.map((cat) => (
@@ -1491,7 +1491,7 @@ const App = () => {
         </div>
       ) : (
         displayJobs.map((job) => (
-          <div key={job.id} className={`bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100/80 dark:border-gray-700/80 hover:shadow-lg hover:border-orange-200 dark:hover:border-orange-900/50 transition-all duration-300 group ${job.isPremium ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}>
+          <div key={job.id} className={`bg-poussin-100 dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100/80 dark:border-gray-700/80 hover:shadow-lg hover:border-orange-200 dark:hover:border-orange-900/50 transition-all duration-300 group ${job.isPremium ? 'ring-2 ring-amber-400 dark:ring-amber-500/50' : ''}`}>
              
              {job.isPremium && (
                <div className="flex items-center gap-1 text-amber-500 text-xs font-bold uppercase tracking-wider mb-2">
@@ -1516,7 +1516,7 @@ const App = () => {
                         className={`text-[10px] px-2 py-0.5 rounded-full cursor-pointer transition-colors border ${
                             filterTag === tag 
                             ? 'bg-orange-500 text-white border-orange-500' 
-                            : 'bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-600 hover:border-orange-300 dark:hover:border-gray-500'
+                            : 'bg-poussin-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-100 dark:border-gray-600 hover:border-orange-300 dark:hover:border-gray-500'
                         }`}
                         >
                         #{tag}
@@ -1699,7 +1699,7 @@ const App = () => {
     return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-20">
       {/* Profile Header */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6 text-center relative overflow-hidden">
+      <div className="bg-poussin-100 dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6 text-center relative overflow-hidden">
         
         {profile.isPremium && (
           <div className="absolute top-0 right-0 bg-gradient-to-bl from-amber-400 to-orange-500 text-white px-4 py-1 rounded-bl-2xl font-bold text-xs flex items-center gap-1 shadow-lg">
@@ -1782,7 +1782,7 @@ const App = () => {
       </div>
 
       {/* Profile Form */}
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+      <div className="bg-poussin-100 dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
         <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Informations du profil</h3>
 
         <div className="space-y-4">
@@ -1791,7 +1791,7 @@ const App = () => {
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Nom complet</label>
               <input
                 type="text"
-                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                className="w-full p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
                 value={form.name}
                 onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
                 onBlur={e => flushFieldToProfile('name', e.target.value)}
@@ -1802,7 +1802,7 @@ const App = () => {
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Email</label>
               <input
                 type="email"
-                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                className="w-full p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
                 value={form.email}
                 onChange={e => setForm(prev => ({ ...prev, email: e.target.value }))}
                 onBlur={e => flushFieldToProfile('email', e.target.value)}
@@ -1816,7 +1816,7 @@ const App = () => {
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Métier / rôle principal</label>
               <input
                 type="text"
-                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                className="w-full p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
                 value={form.jobTitle}
                 onChange={e => setForm(prev => ({ ...prev, jobTitle: e.target.value }))}
                 onBlur={e => flushFieldToProfile('jobTitle', e.target.value)}
@@ -1827,7 +1827,7 @@ const App = () => {
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Zone / ville préférée</label>
               <input
                 type="text"
-                className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                className="w-full p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
                 value={form.locationPreference}
                 onChange={e => setForm(prev => ({ ...prev, locationPreference: e.target.value }))}
                 onBlur={e => flushFieldToProfile('locationPreference', e.target.value)}
@@ -1840,7 +1840,7 @@ const App = () => {
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Disponibilités</label>
             <input
               type="text"
-              className="w-full p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+              className="w-full p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
               value={form.availability}
               onChange={e => setForm(prev => ({ ...prev, availability: e.target.value }))}
               onBlur={e => flushFieldToProfile('availability', e.target.value)}
@@ -1870,7 +1870,7 @@ const App = () => {
             <div className="flex gap-2">
               <input
                 type="text"
-                className="flex-1 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
+                className="flex-1 p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white"
                 value={skillInput}
                 onChange={e => setSkillInput(e.target.value)}
                 onKeyDown={handleSkillInputKeyDown}
@@ -1889,7 +1889,7 @@ const App = () => {
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase">Présentation / bio</label>
             <textarea
-              className="w-full min-h-[90px] p-2.5 rounded-lg bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white resize-y"
+              className="w-full min-h-[90px] p-2.5 rounded-lg bg-poussin-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 text-sm outline-none focus:border-orange-500 dark:focus:border-orange-500 dark:text-white resize-y"
               value={form.bio}
               onChange={e => setForm(prev => ({ ...prev, bio: e.target.value }))}
               onBlur={e => flushFieldToProfile('bio', e.target.value)}
@@ -1903,13 +1903,13 @@ const App = () => {
       <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-4 px-2">Candidatures & Missions</h3>
       <div className="space-y-3">
         {appliedJobHistory.length === 0 ? (
-           <div className="text-center py-10 text-gray-400 bg-white dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
+           <div className="text-center py-10 text-gray-400 bg-poussin-100 dark:bg-gray-800 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
              <Briefcase size={32} className="mx-auto mb-2 opacity-50" />
              <p>Aucune candidature pour le moment.</p>
            </div>
         ) : (
            appliedJobHistory.map(job => (
-             <div key={job.id} className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex justify-between items-center shadow-sm">
+             <div key={job.id} className="bg-poussin-100 dark:bg-gray-800 p-4 rounded-2xl border border-gray-100 dark:border-gray-700 flex justify-between items-center shadow-sm">
                 <div>
                   <h4 className="font-bold text-gray-900 dark:text-white">{job.title}</h4>
                   <p className="text-sm text-gray-500 dark:text-gray-400">{formatPrice(job.numericPrice)} • {job.postedTime}</p>
@@ -1922,7 +1922,7 @@ const App = () => {
                    ) : (
                      <button 
                        onClick={() => handleCompleteMission(job.id, job.title)}
-                       className="px-3 py-1.5 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                       className="px-3 py-1.5 border border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 rounded-lg text-xs font-medium hover:bg-poussin-200 dark:hover:bg-gray-700 transition-colors"
                      >
                        Marquer terminé
                      </button>
@@ -1938,7 +1938,7 @@ const App = () => {
 
   const AdminView = () => (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-20">
-      <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
+      <div className="bg-poussin-100 dark:bg-gray-800 rounded-3xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 mb-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <ShieldCheck size={28} className="text-orange-500" />
@@ -1959,19 +1959,19 @@ const App = () => {
           Vue d’ensemble de la plateforme (données locales uniquement).
         </p>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+          <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{jobs.length}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Annonces</div>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+          <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{appliedJobHistory.length}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Candidatures</div>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+          <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{profile.isPremium ? 'Oui' : 'Non'}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Profil Premium</div>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl text-center">
+          <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl text-center">
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{isTelegramWebApp ? 'Oui' : 'Non'}</div>
             <div className="text-xs text-gray-500 dark:text-gray-400 uppercase">Via Telegram</div>
           </div>
@@ -1988,7 +1988,7 @@ const App = () => {
     
     return (
       <div className="max-w-3xl mx-auto px-4 py-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-300">
-         <div className="bg-white dark:bg-gray-800 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-gray-700 text-center">
+         <div className="bg-poussin-100 dark:bg-gray-800 rounded-3xl p-8 shadow-lg border border-gray-100 dark:border-gray-700 text-center">
             {selectedPublicProfile.profilePicture ? (
               <img
                 src={selectedPublicProfile.profilePicture}
@@ -2038,7 +2038,7 @@ const App = () => {
               <div className="space-y-4">
                  {selectedPublicProfile.reviews.length > 0 ? (
                    selectedPublicProfile.reviews.map(review => (
-                     <div key={review.id} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl">
+                     <div key={review.id} className="bg-poussin-50 dark:bg-gray-700/50 p-4 rounded-xl">
                         <div className="flex justify-between items-start mb-2">
                            <span className="font-bold text-gray-900 dark:text-white text-sm">{review.clientName}</span>
                            <div className="flex gap-0.5">
@@ -2063,7 +2063,7 @@ const App = () => {
 
   const AboutView = () => (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-20 text-center">
-       <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
+       <div className="bg-poussin-100 dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
           <div className="w-20 h-20 bg-orange-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-orange-200 dark:shadow-none transform rotate-3">
              <Briefcase size={40} />
           </div>
@@ -2074,17 +2074,17 @@ const App = () => {
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+             <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl">
              <Zap className="mx-auto mb-2 text-amber-500" size={24} />
              <h3 className="font-bold text-gray-900 dark:text-white text-sm">Rapide</h3>
              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Trouvez en moins de 5 min</p>
           </div>
-             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+             <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl">
                 <ShieldCheck className="mx-auto mb-2 text-green-500" size={24} />
                 <h3 className="font-bold text-gray-900 dark:text-white text-sm">Sécurisé</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Profils vérifiés</p>
              </div>
-             <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl">
+             <div className="p-4 bg-poussin-50 dark:bg-gray-700/50 rounded-xl">
                 <Euro className="mx-auto mb-2 text-blue-500" size={24} />
                 <h3 className="font-bold text-gray-900 dark:text-white text-sm">Économique</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Prix justes</p>
@@ -2107,7 +2107,7 @@ const App = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors duration-300 pt-20">
+    <div className="min-h-screen bg-poussin-50 dark:bg-gray-900 transition-colors duration-300 pt-20">
       <Navbar />
       
       {currentView === 'home' && (
