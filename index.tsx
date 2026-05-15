@@ -949,9 +949,15 @@ const App = () => {
   const HomeLogoBlock = () => (
     <div className="bg-poussin-100 dark:bg-gray-800 border-b border-poussin-200 dark:border-gray-700/80 transition-colors">
       <div className="max-w-4xl mx-auto px-4 py-5 flex items-center gap-4">
-        <div className="flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/20">
-          <Briefcase size={28} />
-        </div>
+        <img
+          src="/logo-jg.png"
+          alt="Je Gjobe"
+          width={56}
+          height={56}
+          className="w-14 h-14 rounded-2xl object-contain shrink-0 drop-shadow-md"
+          loading="eager"
+          decoding="async"
+        />
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Je Gjobe</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Trouvez des missions près de chez vous</p>
@@ -2064,9 +2070,15 @@ const App = () => {
   const AboutView = () => (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-20 text-center">
        <div className="bg-poussin-100 dark:bg-gray-800 p-8 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700">
-          <div className="w-20 h-20 bg-orange-500 text-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-orange-200 dark:shadow-none transform rotate-3">
-             <Briefcase size={40} />
-          </div>
+          <img
+            src="/logo-jg.png"
+            alt="Je Gjobe"
+            width={80}
+            height={80}
+            className="w-20 h-20 mx-auto mb-6 object-contain drop-shadow-lg transform rotate-3"
+            loading="lazy"
+            decoding="async"
+          />
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">Je Gjobe</h2>
           <p className="text-gray-600 dark:text-gray-300 mb-8 leading-relaxed">
              La plateforme de mise en relation de confiance pour tous vos besoins de services à domicile et petits travaux. 
