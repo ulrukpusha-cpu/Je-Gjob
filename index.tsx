@@ -960,23 +960,20 @@ const App = () => {
     </div>
   );
 
-  // Bande verte design (separateur visuel entre sections de la home)
-  const GreenBar = () => <div className="h-[3px] w-full bg-emerald-500/80" />;
-
   const BottomNav = () => {
     const activeTab = 'home';
 
     const navItemClass = (isActive: boolean) =>
       `flex flex-col items-center justify-center gap-0.5 min-w-[4.25rem] py-2 px-3 rounded-full transition-all duration-200 ${
         isActive
-          ? 'bg-gray-100 text-[#007AFF] dark:bg-[#333333] dark:text-[#007AFF]'
-          : 'text-gray-600 hover:text-gray-900 dark:text-white/90 dark:hover:text-white'
+          ? 'bg-orange-500/15 text-orange-500 dark:bg-orange-500/20 dark:text-orange-400'
+          : 'text-gray-500 hover:text-orange-500 hover:bg-orange-500/10 dark:text-gray-400 dark:hover:text-orange-400 dark:hover:bg-orange-500/10'
       }`;
 
     return (
       <div className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-center gap-3 px-4 pb-[max(12px,env(safe-area-inset-bottom))] md:left-1/2 md:-translate-x-1/2 md:max-w-lg pointer-events-none">
         <nav
-          className="pointer-events-auto flex flex-1 items-center justify-around min-h-[58px] max-w-[calc(100%-3.75rem)] rounded-full bg-white/90 backdrop-blur-xl border border-gray-200/70 shadow-lg shadow-black/5 dark:bg-[rgba(34,34,34,0.82)] dark:border-white/[0.08] dark:shadow-black/25 px-1 py-1"
+          className="pointer-events-auto flex flex-1 items-center justify-around min-h-[58px] max-w-[calc(100%-3.75rem)] rounded-full bg-white/95 backdrop-blur-xl border border-gray-200/80 shadow-lg shadow-black/5 dark:bg-gray-900/95 dark:border-gray-700/60 dark:shadow-black/30 px-1 py-1"
           aria-label="Navigation principale"
         >
           <button
@@ -985,23 +982,8 @@ const App = () => {
             aria-label="Missions"
             aria-current={activeTab === 'home' ? 'page' : undefined}
           >
-            <Briefcase size={22} strokeWidth={activeTab === 'home' ? 2.25 : 2} className={activeTab === 'home' ? 'text-[#007AFF]' : undefined} />
-            <span className={`text-[10px] font-medium leading-none ${activeTab === 'home' ? 'text-[#007AFF]' : ''}`}>Missions</span>
-          </button>
-          <button
-            onClick={() => handleNavigate('profile')}
-            className={navItemClass(false)}
-            aria-label="Candidatures"
-          >
-            <span className="relative">
-              <Check size={22} strokeWidth={2} />
-              {appliedJobs.size > 0 && (
-                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center bg-[#007AFF] text-white text-[10px] font-bold rounded-full px-1">
-                  {appliedJobs.size}
-                </span>
-              )}
-            </span>
-            <span className="text-[10px] font-medium leading-none">Candidatures</span>
+            <Briefcase size={22} strokeWidth={activeTab === 'home' ? 2.25 : 2} className={activeTab === 'home' ? 'text-orange-500 dark:text-orange-400' : undefined} />
+            <span className={`text-[10px] font-medium leading-none ${activeTab === 'home' ? 'text-orange-500 dark:text-orange-400' : ''}`}>Missions</span>
           </button>
 
           <button
@@ -1011,9 +993,9 @@ const App = () => {
           >
             <span className="relative">
               {profile.isCreated && profile.profilePicture ? (
-                <img src={profile.profilePicture} alt="" className="w-6 h-6 rounded-full object-cover ring-1 ring-gray-200 dark:ring-white/20" />
+                <img src={profile.profilePicture} alt="" className="w-8 h-8 rounded-full object-cover ring-2 ring-orange-500/40 dark:ring-orange-400/50" />
               ) : (
-                <User size={22} strokeWidth={2} />
+                <User size={24} strokeWidth={2} />
               )}
               {profile.isPremium && (
                 <Crown size={11} className="text-amber-500 absolute -top-1 -right-1.5 fill-amber-500" />
@@ -1021,11 +1003,27 @@ const App = () => {
             </span>
             <span className="text-[10px] font-medium leading-none">Profil</span>
           </button>
+
+          <button
+            onClick={() => handleNavigate('profile')}
+            className={navItemClass(false)}
+            aria-label="Candidatures"
+          >
+            <span className="relative">
+              <Check size={22} strokeWidth={2} />
+              {appliedJobs.size > 0 && (
+                <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 flex items-center justify-center bg-orange-500 text-white text-[10px] font-bold rounded-full px-1">
+                  {appliedJobs.size}
+                </span>
+              )}
+            </span>
+            <span className="text-[10px] font-medium leading-none">Candidatures</span>
+          </button>
         </nav>
 
         <button
           onClick={() => handleNavigate('create_job')}
-          className="pointer-events-auto flex shrink-0 items-center justify-center w-14 h-14 rounded-full bg-white/90 backdrop-blur-xl border border-gray-200/70 text-gray-800 shadow-lg shadow-black/5 hover:scale-105 active:scale-95 transition-all dark:bg-[rgba(34,34,34,0.82)] dark:border-white/[0.08] dark:text-white dark:shadow-black/25"
+          className="pointer-events-auto flex shrink-0 items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-500/35 hover:shadow-orange-500/50 hover:scale-105 active:scale-95 transition-all"
           aria-label="Publier une annonce"
         >
           <Plus size={26} strokeWidth={2.5} />
@@ -2114,14 +2112,10 @@ const App = () => {
       
       {currentView === 'home' && (
         <>
-          <GreenBar />
           <HomeLogoBlock />
-          <GreenBar />
           <LocationHeader />
           <CategoryFilter />
-          <GreenBar />
           <JobList />
-          <GreenBar />
         </>
       )}
 
